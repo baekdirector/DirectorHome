@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { BottomNav } from '../components/BottomNav'
 import { Spinner } from '../components/Loading'
-import { BookIcon, ChartIcon, ChevronRightIcon, CheckCircleIcon, PencilIcon, StarIcon, XCircleIcon } from '../components/icons'
+import { BookIcon, ChartIcon, ChevronRightIcon, CheckCircleIcon, PencilIcon, StarIcon, WalletIcon, XCircleIcon } from '../components/icons'
 import { getHomeStats, type HomeStats } from '../lib/db'
 import { useSlowLoading } from '../lib/useSlowLoading'
 
@@ -107,6 +107,17 @@ export function Home() {
             <div className="flex-1">
               <div className="text-[16px] font-bold">내 단어장 보기</div>
               <div className="mt-0.5 text-[12.5px] text-ink-muted">저장된 단어장 확인하고 수정하기</div>
+            </div>
+            <ChevronRightIcon width={18} height={18} className="text-ink-muted" />
+          </Link>
+
+          <Link to="/household" className="flex items-center gap-3.5 rounded-[20px] border border-border bg-surface p-4.5">
+            <div className="flex h-11 w-11 flex-none items-center justify-center rounded-2xl bg-hh-pine-tint">
+              <WalletIcon width={20} height={20} className="text-hh-pine" strokeWidth={1.8} />
+            </div>
+            <div className="flex-1">
+              <div className="text-[16px] font-bold">가계부</div>
+              <div className="mt-0.5 text-[12.5px] text-ink-muted">우리 집 지출 관리</div>
             </div>
             <ChevronRightIcon width={18} height={18} className="text-ink-muted" />
           </Link>

@@ -187,3 +187,13 @@ export function InfoIcon(props: IconProps) {
     </svg>
   )
 }
+
+export function WalletIcon(props: IconProps) {
+  return (
+    <svg {...base(props)}>
+      <path d="M4 7a2 2 0 0 1 2-2h11a1 1 0 0 1 1 1v2" />
+      <path d="M4 7v10a2 2 0 0 0 2 2h13a1 1 0 0 0 1-1v-9a1 1 0 0 0-1-1H6a2 2 0 0 1-2-2Z" />
+      <circle cx="16.5" cy="13.5" r="1.2" fill="currentColor" stroke="none" />
+    </svg>
+  )
+}

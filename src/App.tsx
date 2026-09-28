@@ -8,6 +8,9 @@ import { TestSelect } from './pages/TestSelect'
 import { WrongNotes } from './pages/WrongNotes'
 import { ParentDashboard } from './pages/ParentDashboard'
 import { ParentSessionDetail } from './pages/ParentSessionDetail'
+import { Household } from './pages/Household'
+import { HouseholdCategories } from './pages/HouseholdCategories'
+import { HouseholdStats } from './pages/HouseholdStats'
 
 function App() {
   return (
@@ -25,6 +28,9 @@ function App() {
         <Route path="/wrong/quiz" element={<Quiz />} />
         <Route path="/parent" element={<ParentDashboard />} />
         <Route path="/parent/session/:groupId" element={<ParentSessionDetail />} />
+        <Route path="/household" element={<Household />} />
+        <Route path="/household/stats" element={<HouseholdStats />} />
+        <Route path="/household/categories" element={<HouseholdCategories />} />
       </Routes>
     </BrowserRouter>
   )
