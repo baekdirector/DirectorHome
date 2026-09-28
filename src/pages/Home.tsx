@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
+import { AppDrawer } from '../components/AppDrawer'
 import { BottomNav } from '../components/BottomNav'
 import { Spinner } from '../components/Loading'
-import { BookIcon, ChartIcon, ChevronRightIcon, CheckCircleIcon, PencilIcon, StarIcon, WalletIcon, XCircleIcon } from '../components/icons'
+import { BookIcon, ChartIcon, ChevronRightIcon, CheckCircleIcon, PencilIcon, StarIcon, XCircleIcon } from '../components/icons'
 import { getHomeStats, type HomeStats } from '../lib/db'
 import { useSlowLoading } from '../lib/useSlowLoading'
 
@@ -15,6 +16,7 @@ function todayLabel() {
 export function Home() {
   const [stats, setStats] = useState<HomeStats | null>(null)
   const [statsFailed, setStatsFailed] = useState(false)
+  const [drawerOpen, setDrawerOpen] = useState(false)
 
   useEffect(() => {
     getHomeStats()
@@ -30,10 +32,15 @@ export function Home() {
     <div className="flex min-h-svh flex-col bg-bg">
       <div className="flex flex-1 flex-col px-[22px] pb-6">
         <div className="flex items-center justify-between pt-5">
-          <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setDrawerOpen(true)}
+            aria-label="서비스 전환 메뉴 열기"
+            className="flex items-center gap-2"
+          >
             <img src="/icons/icon-192.png" alt="" width={36} height={36} className="h-9 w-9 rounded-[10px]" />
             <span className="font-display text-[19px] font-bold">JunsVoca</span>
-          </div>
+          </button>
           <Link
             to="/parent"
             aria-label="부모 결과 리포트 보기"
@@ -111,17 +118,6 @@ export function Home() {
             <ChevronRightIcon width={18} height={18} className="text-ink-muted" />
           </Link>
 
-          <Link to="/household" className="flex items-center gap-3.5 rounded-[20px] border border-border bg-surface p-4.5">
-            <div className="flex h-11 w-11 flex-none items-center justify-center rounded-2xl bg-hh-pine-tint">
-              <WalletIcon width={20} height={20} className="text-hh-pine" strokeWidth={1.8} />
-            </div>
-            <div className="flex-1">
-              <div className="text-[16px] font-bold">가계부</div>
-              <div className="mt-0.5 text-[12.5px] text-ink-muted">우리 집 지출 관리</div>
-            </div>
-            <ChevronRightIcon width={18} height={18} className="text-ink-muted" />
-          </Link>
-
           <Link
             to="/input"
             className="mt-1 flex items-center justify-center gap-2 rounded-[20px] border-[1.5px] border-dashed border-border p-4 text-[14px] font-semibold text-ink-muted"
@@ -131,6 +127,7 @@ export function Home() {
         </div>
       </div>
       <BottomNav />
+      <AppDrawer open={drawerOpen} onClose={() => setDrawerOpen(false)} />
     </div>
   )
 }
