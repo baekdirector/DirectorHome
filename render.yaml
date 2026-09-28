@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: junsvoca
+    name: directorhome
     runtime: node
     plan: free
     branch: main

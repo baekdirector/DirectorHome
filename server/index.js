@@ -55,7 +55,7 @@ const port = process.env.PORT || 3000
 
 migrate()
   .then(() => {
-    app.listen(port, () => console.log(`JunsVoca server listening on :${port}`))
+    app.listen(port, () => console.log(`DirectorHome server listening on :${port}`))
   })
   .catch((err) => {
     console.error('Migration failed', err)
