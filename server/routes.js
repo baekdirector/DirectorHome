@@ -363,6 +363,16 @@ router.get('/home-stats', async (_req, res) => {
 
 // ---- household expense tracker ----
 
+// 로그인 시스템이 아니라 '가계부' 메뉴 진입용 비밀번호 확인만 한다. DB는 쓰지 않는다.
+router.post('/expense/verify-password', (req, res) => {
+  const { password } = req.body
+  const expected = process.env.HOUSEHOLD_PASSWORD
+  if (!expected) {
+    return res.status(500).json({ error: 'HOUSEHOLD_PASSWORD is not configured' })
+  }
+  res.json({ ok: password === expected })
+})
+
 router.get('/expense/categories', async (_req, res) => {
   const { rows } = await pool.query(`
     SELECT id, name, group_type AS "groupType", display_order AS "displayOrder",
