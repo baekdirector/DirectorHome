@@ -3,6 +3,7 @@ import { Bar, BarChart, CartesianGrid, Line, LineChart, ResponsiveContainer, Too
 import { HouseholdGate } from '../components/HouseholdGate'
 import { HouseholdNav } from '../components/HouseholdNav'
 import { LoadError } from '../components/LoadError'
+import { Loading } from '../components/Loading'
 import {
   formatWon,
   getCategories,
@@ -171,6 +172,15 @@ function StatsContent() {
         <div className="flex-1">
           <LoadError screen={false} message="통계를 불러오지 못했어요." onRetry={load} />
         </div>
+      </div>
+    )
+  }
+
+  if (!categories || !entries || !summary) {
+    return (
+      <div className="flex min-h-svh flex-col bg-bg">
+        <HouseholdNav />
+        <Loading />
       </div>
     )
   }

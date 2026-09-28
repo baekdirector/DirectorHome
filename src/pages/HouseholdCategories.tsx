@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react'
 import { HouseholdGate } from '../components/HouseholdGate'
 import { HouseholdNav } from '../components/HouseholdNav'
+import { LoadError } from '../components/LoadError'
+import { Loading } from '../components/Loading'
 import { createCategory, getCategories, updateCategory, type ExpenseCategory, type ExpenseGroup } from '../lib/household'
 
 const GROUP_OPTIONS: { value: ExpenseGroup; label: string }[] = [
@@ -20,11 +22,17 @@ export function HouseholdCategories() {
 }
 
 function CategoriesContent() {
-  const [categories, setCategories] = useState<ExpenseCategory[]>([])
+  const [categories, setCategories] = useState<ExpenseCategory[] | null>(null)
+  const [loadFailed, setLoadFailed] = useState(false)
   const [name, setName] = useState('')
   const [groupType, setGroupType] = useState<ExpenseGroup>('variable')
 
-  const reload = () => getCategories().then(setCategories)
+  const reload = () => {
+    setLoadFailed(false)
+    return getCategories()
+      .then(setCategories)
+      .catch(() => setLoadFailed(true))
+  }
   useEffect(() => {
     reload()
   }, [])
@@ -33,7 +41,7 @@ function CategoriesContent() {
     if (!name.trim()) return
     // displayOrder를 안 넘기면 서버가 항상 0으로 만들어서, 같은 그룹에 0인 항목이 여러 개면
     // move()의 스왑이 눈에 보이는 효과가 없다. 그룹 내 최대값 다음으로 배치한다.
-    const siblings = categories.filter((c) => c.groupType === groupType)
+    const siblings = (categories ?? []).filter((c) => c.groupType === groupType)
     const nextDisplayOrder = siblings.length === 0 ? 0 : Math.max(...siblings.map((c) => c.displayOrder)) + 1
     await createCategory({ name: name.trim(), groupType, displayOrder: nextDisplayOrder })
     setName('')
@@ -46,7 +54,7 @@ function CategoriesContent() {
   }
 
   async function move(cat: ExpenseCategory, direction: -1 | 1) {
-    const siblings = categories
+    const siblings = (categories ?? [])
       .filter((c) => c.groupType === cat.groupType && !c.archivedAt)
       .sort((a, b) => a.displayOrder - b.displayOrder)
     const index = siblings.findIndex((c) => c.id === cat.id)
@@ -58,6 +66,26 @@ function CategoriesContent() {
       updateCategory(target.id, { displayOrder: cat.displayOrder }),
     ])
     reload()
+  }
+
+  if (loadFailed) {
+    return (
+      <div className="flex min-h-svh flex-col bg-bg">
+        <HouseholdNav />
+        <div className="flex-1">
+          <LoadError screen={false} message="항목 정보를 불러오지 못했어요." onRetry={reload} />
+        </div>
+      </div>
+    )
+  }
+
+  if (!categories) {
+    return (
+      <div className="flex min-h-svh flex-col bg-bg">
+        <HouseholdNav />
+        <Loading />
+      </div>
+    )
   }
 
   return (

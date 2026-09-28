@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { HouseholdGate } from '../components/HouseholdGate'
 import { HouseholdNav } from '../components/HouseholdNav'
 import { LoadError } from '../components/LoadError'
+import { Loading } from '../components/Loading'
 import {
   formatWon,
   findMonthSummary,
@@ -191,7 +192,7 @@ function HouseholdContent() {
       <div className="flex min-h-svh flex-col bg-bg">
         <HouseholdNav />
         {!categories ? (
-          <div className="flex flex-1 items-center justify-center text-ink-muted">불러오는 중...</div>
+          <Loading />
         ) : (
           <div className="flex-1">
             <LoadError
@@ -209,7 +210,7 @@ function HouseholdContent() {
     return (
       <div className="flex min-h-svh flex-col bg-bg">
         <HouseholdNav />
-        <div className="flex flex-1 items-center justify-center text-ink-muted">불러오는 중...</div>
+        <Loading />
       </div>
     )
   }
@@ -267,7 +268,7 @@ function HouseholdContent() {
               <div key={cat.id} className="flex items-center gap-3 border-b border-hh-divider py-3.5">
                 <div className={`h-8 w-[3px] flex-none rounded-full ${GROUP_BAR_CLASS[group]}`} />
                 <div className="flex-1 text-[15px] font-medium">{cat.name}</div>
-                <div className="relative w-[120px] mb-4">
+                <div className="relative w-[124px] mb-4">
                   <input
                     inputMode="numeric"
                     disabled={entriesLoading}
@@ -276,7 +277,7 @@ function HouseholdContent() {
                     onFocus={(e) => e.target.select()}
                     onBlur={(e) => saveEntry(cat.id, e.target.value)}
                     placeholder="0"
-                    className="w-full bg-transparent text-right text-[16px] font-semibold tabular-nums outline-none disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="w-full rounded-[10px] border border-border bg-surface-alt px-2.5 py-2 text-right text-[16px] font-semibold tabular-nums outline-none focus:border-hh-pine focus:bg-surface disabled:opacity-50 disabled:cursor-not-allowed"
                   />
                   {saveError?.categoryId === cat.id && (
                     <div className="absolute top-full right-0 mt-1 text-[12px] text-red-500 whitespace-nowrap">
