@@ -1,57 +1,38 @@
-// 서비스 아이콘(파비콘, 설치 아이콘, 공유 미리보기 이미지)을 scripts/icon-source.jpg 한 장에서 만든다.
+// DirectorHome 앱 아이콘(파인그린 배경 + 크림 집 실루엣 + 골드 포인트)을 SVG로 그려
+// 필요한 모든 크기의 PNG/ICO로 내보낸다. 사진이 아니라 벡터라 소스 이미지 파일이 필요 없다.
 //   node scripts/gen-icons.mjs
 import sharp from 'sharp'
 import { mkdirSync, writeFileSync } from 'node:fs'
 
-const SOURCE = 'scripts/icon-source.jpg'
-const BG = { r: 251, g: 127, b: 91 } // 원본 그림의 배경색 (#FB7F5B)
-
-// 얼굴 원(지름 약 2370px)을 중심으로 자른 정사각형 영역 (원본 3832x2748 기준)
-const CROP = { left: 681, top: 30, width: 2500, height: 2500 }
-
-// 얼굴 원만 동그랗게 잘라낸 영역: 몸통이 잘려 생기는 직선 경계를 없애고 배경색 위에 얼굴만 올릴 때 쓴다.
-const BALL = { left: 731, top: 80, size: 2400 }
+const PINE = '#123A34'
+const PINE_RGB = { r: 0x12, g: 0x3a, b: 0x34 }
+const CREAM = '#F4EFE6'
+const GOLD = '#B98A3D'
 
 mkdirSync('public/icons', { recursive: true })
 
-const square = () => sharp(SOURCE).extract(CROP)
-
-/** 일반 아이콘: 자른 그림을 꽉 채우고 모서리만 둥글게. */
-async function rounded(size) {
-  const r = Math.round(size * 0.22)
-  const mask = Buffer.from(
-    `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}"><rect width="${size}" height="${size}" rx="${r}" ry="${r}"/></svg>`,
-  )
-  return square()
-    .resize(size, size)
-    .composite([{ input: mask, blend: 'dest-in' }])
-    .png()
-    .toBuffer()
+/** 100x100 좌표계의 집 실루엣 + 포인트 도트. */
+function houseGroup() {
+  return `<path d="M50 25 L77 47 V75 H60 V57 H40 V75 H23 V47 Z" fill="${CREAM}"/><circle cx="72" cy="30" r="4.2" fill="${GOLD}"/>`
 }
 
-/** 얼굴 원만 동그랗게 잘라 `size`px 크기로 (바깥은 투명). */
-async function ball(size) {
-  const mask = Buffer.from(
-    `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}"><circle cx="${size / 2}" cy="${size / 2}" r="${size / 2}"/></svg>`,
-  )
-  return sharp(SOURCE)
-    .extract({ left: BALL.left, top: BALL.top, width: BALL.size, height: BALL.size })
-    .resize(size, size)
-    .composite([{ input: mask, blend: 'dest-in' }])
-    .png()
-    .toBuffer()
+/**
+ * @param {number} size
+ * @param {{ rounded?: boolean, maskableSafe?: boolean }} [opts]
+ *   maskableSafe: true면 안드로이드가 원/둥근사각형으로 밖을 잘라내도 집이 안 잘리도록
+ *   중앙 66% 안전영역 안에 넣는다.
+ */
+function iconSvg(size, { rounded = true, maskableSafe = false } = {}) {
+  const r = rounded ? Math.round(size * 0.22) : 0
+  const inner = maskableSafe
+    ? `<svg x="17%" y="17%" width="66%" height="66%" viewBox="0 0 100 100">${houseGroup()}</svg>`
+    : `<svg x="0" y="0" width="100%" height="100%" viewBox="0 0 100 100">${houseGroup()}</svg>`
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}"><rect width="${size}" height="${size}" rx="${r}" fill="${PINE}"/>${inner}</svg>`
 }
 
-/** 마스크용 아이콘: 안드로이드가 원/둥근 사각형으로 잘라도 얼굴이 안 잘리게, 얼굴을 안전 영역(중앙 약 66%) 안에 넣는다. */
-async function maskable(size) {
-  return sharp({ create: { width: size, height: size, channels: 3, background: BG } })
-    .composite([{ input: await ball(Math.round(size * 0.68)), gravity: 'centre' }])
-    .png()
-    .toBuffer()
+async function png(size, opts) {
+  return sharp(Buffer.from(iconSvg(size, opts))).png().toBuffer()
 }
-
-/** iOS는 알아서 모서리를 둥글게 하므로 투명 없이 꽉 채운다. */
-const appleTouch = (size) => square().resize(size, size).png().toBuffer()
 
 /** PNG 이미지들을 담은 .ico 파일을 만든다. */
 function buildIco(entries) {
@@ -79,32 +60,31 @@ const write = (path, data) => {
   console.log('generated', path)
 }
 
-write('public/icons/icon-192.png', await rounded(192))
-write('public/icons/icon-512.png', await rounded(512))
-write('public/icons/apple-touch-icon.png', await appleTouch(180))
-write('public/icons/icon-maskable-192.png', await maskable(192))
-write('public/icons/icon-maskable-512.png', await maskable(512))
+write('public/icons/icon-192.png', await png(192))
+write('public/icons/icon-512.png', await png(512))
+write('public/icons/apple-touch-icon.png', await png(180, { rounded: false })) // iOS가 알아서 둥글게 처리
+write('public/icons/icon-maskable-192.png', await png(192, { maskableSafe: true }))
+write('public/icons/icon-maskable-512.png', await png(512, { maskableSafe: true }))
 
-// 파비콘: 작은 크기에서도 알아보도록 그림을 꽉 채운다 (둥근 모서리 없음).
+// 파비콘: 작은 크기에서도 잘 보이도록 모서리를 둥글리지 않고 꽉 채운다.
 const favSizes = [16, 32, 48]
-const favs = await Promise.all(favSizes.map(async (size) => ({ size, data: await appleTouch(size) })))
+const favs = await Promise.all(favSizes.map(async (size) => ({ size, data: await png(size, { rounded: false }) })))
 write('public/favicon.ico', buildIco(favs))
 
 // 링크 공유(카카오톡 등) 미리보기 이미지 1200x630
 const OG_W = 1200
 const OG_H = 630
-const art = await ball(540)
+const houseArt = await png(320)
 const text = Buffer.from(`<svg xmlns="http://www.w3.org/2000/svg" width="${OG_W}" height="${OG_H}">
   <style>
-    .t { font-family: 'Malgun Gothic', 'Noto Sans KR', 'Apple SD Gothic Neo', sans-serif; fill: #fff; }
+    .t { font-family: 'Malgun Gothic', 'Noto Sans KR', 'Apple SD Gothic Neo', sans-serif; fill: ${CREAM}; }
   </style>
-  <text class="t" x="640" y="290" font-size="104" font-weight="800">JunsVoca</text>
-  <text class="t" x="644" y="372" font-size="42" font-weight="700">초등 영어 단어 테스트</text>
-  <text class="t" x="644" y="436" font-size="30" opacity="0.92">단어장 만들고 · 시험 보고 · 오답 노트</text>
+  <text class="t" x="460" y="330" font-size="88" font-weight="800">DirectorHome</text>
+  <text class="t" x="464" y="392" font-size="34" font-weight="700" opacity="0.85">자녀 학습 · 가계부, 한 곳에서</text>
 </svg>`)
-await sharp({ create: { width: OG_W, height: OG_H, channels: 3, background: BG } })
+await sharp({ create: { width: OG_W, height: OG_H, channels: 3, background: PINE_RGB } })
   .composite([
-    { input: art, left: 70, top: 45 },
+    { input: houseArt, left: 80, top: 155 },
     { input: text, left: 0, top: 0 },
   ])
   .png()
