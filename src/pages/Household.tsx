@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { HouseholdGate } from '../components/HouseholdGate'
 import { HouseholdNav } from '../components/HouseholdNav'
 import { LoadError } from '../components/LoadError'
@@ -52,6 +52,12 @@ function HouseholdContent() {
   const [entriesLoading, setEntriesLoading] = useState(true)
   const [entriesFailed, setEntriesFailed] = useState(false)
   const [saveError, setSaveError] = useState<{ categoryId: number; message: string } | null>(null)
+  // 연도를 빠르게 바꿀 때 이전 연도의 응답이 나중에 도착해 최신 화면을 덮어쓰지 않도록 "마지막 요청만 반영" 가드.
+  const entriesRequestIdRef = useRef(0)
+  const yearRef = useRef(year)
+  useEffect(() => {
+    yearRef.current = year
+  }, [year])
 
   const retryCategories = async () => {
     setCategoriesFailed(false)
@@ -64,16 +70,19 @@ function HouseholdContent() {
   }
 
   const retryEntries = async () => {
+    const requestId = ++entriesRequestIdRef.current
     setEntriesFailed(false)
     setEntriesLoading(true)
     try {
       const [entriesData, summaryData] = await Promise.all([getEntries(year), getSummary(year)])
+      if (entriesRequestIdRef.current !== requestId) return // 더 최신 요청이 이미 나감 -> 이 응답은 버린다
       setEntries(entriesData)
       setSummary(summaryData)
     } catch (e) {
+      if (entriesRequestIdRef.current !== requestId) return
       setEntriesFailed(true)
     } finally {
-      setEntriesLoading(false)
+      if (entriesRequestIdRef.current === requestId) setEntriesLoading(false)
     }
   }
 
@@ -118,14 +127,43 @@ function HouseholdContent() {
   async function saveEntry(categoryId: number, raw: string) {
     const amount = parseWonInput(raw)
     const previousValue = inputs[categoryId] ?? ''
+    const entryYear = year
+    const entryMonth = month
 
     setInputs((prev) => ({ ...prev, [categoryId]: formatWon(amount) }))
     setSaveError(null)
 
     try {
-      await putEntry({ categoryId, year, month, amount })
-      const newSummary = await getSummary(year)
-      setSummary(newSummary)
+      const { id } = await putEntry({ categoryId, year: entryYear, month: entryMonth, amount })
+      // entries 배열에도 반영해야 한다. 그러지 않으면 [entries, month] 이펙트가 저장 전 stale 값으로
+      // inputs를 다시 만들어, 다른 달로 갔다가 돌아왔을 때 방금 저장한 값이 빈칸으로 보인다.
+      if (yearRef.current === entryYear) {
+        setEntries((prev) => {
+          const list = prev ?? []
+          const idx = list.findIndex(
+            (e) => e.categoryId === categoryId && e.year === entryYear && e.month === entryMonth,
+          )
+          if (idx >= 0) {
+            const next = [...list]
+            next[idx] = { ...next[idx], id, amount, updatedAt: Date.now() }
+            return next
+          }
+          const synthesized: ExpenseEntry = {
+            id,
+            categoryId,
+            year: entryYear,
+            month: entryMonth,
+            amount,
+            memo: null,
+            updatedAt: Date.now(),
+          }
+          return [...list, synthesized]
+        })
+      }
+      const newSummary = await getSummary(entryYear)
+      if (yearRef.current === entryYear) {
+        setSummary(newSummary)
+      }
     } catch (e) {
       // Rollback: restore the previous value
       setInputs((prev) => ({ ...prev, [categoryId]: previousValue }))

@@ -7,7 +7,7 @@ describe('POST /expense/verify-password', () => {
   let baseUrl
 
   beforeAll(() => {
-    process.env.HOUSEHOLD_PASSWORD = 'admin/017hand!'
+    process.env.HOUSEHOLD_PASSWORD = 'test-only-password'
     const app = express()
     app.use(express.json())
     app.use('/api', router)
@@ -25,7 +25,7 @@ describe('POST /expense/verify-password', () => {
     const res = await fetch(`${baseUrl}/expense/verify-password`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ password: 'admin/017hand!' }),
+      body: JSON.stringify({ password: 'test-only-password' }),
     })
     expect(await res.json()).toEqual({ ok: true })
   })

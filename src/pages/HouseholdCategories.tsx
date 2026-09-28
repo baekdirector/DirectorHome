@@ -31,7 +31,11 @@ function CategoriesContent() {
 
   async function add() {
     if (!name.trim()) return
-    await createCategory({ name: name.trim(), groupType })
+    // displayOrder를 안 넘기면 서버가 항상 0으로 만들어서, 같은 그룹에 0인 항목이 여러 개면
+    // move()의 스왑이 눈에 보이는 효과가 없다. 그룹 내 최대값 다음으로 배치한다.
+    const siblings = categories.filter((c) => c.groupType === groupType)
+    const nextDisplayOrder = siblings.length === 0 ? 0 : Math.max(...siblings.map((c) => c.displayOrder)) + 1
+    await createCategory({ name: name.trim(), groupType, displayOrder: nextDisplayOrder })
     setName('')
     reload()
   }

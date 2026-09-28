@@ -10,6 +10,7 @@
 //   "openingYear": 2021, "openingMonth": 1, "openingBalance": 0
 // }
 import { readFileSync } from 'node:fs'
+import { pathToFileURL } from 'node:url'
 import pg from 'pg'
 
 /** 알 수 없는 카테고리를 참조하는 entry를 걸러낸다. DB를 건드리지 않는 순수 함수. */
@@ -42,41 +43,65 @@ async function main() {
   })
 
   const categoryIds = new Map()
-  for (const cat of categories) {
-    const {
-      rows: [row],
-    } = await pool.query(
-      `INSERT INTO expense_categories (name, group_type, display_order, created_at)
-       VALUES ($1, $2, $3, $4) RETURNING id`,
-      [cat.name, cat.groupType, cat.displayOrder ?? 0, Date.now()],
-    )
-    categoryIds.set(cat.name, row.id)
-  }
+  const client = await pool.connect()
+  try {
+    await client.query('BEGIN')
 
-  for (const entry of entries) {
-    await pool.query(
-      `INSERT INTO expense_entries (category_id, year, month, amount, updated_at)
-       VALUES ($1, $2, $3, $4, $5)
-       ON CONFLICT (category_id, year, month) DO UPDATE SET amount = EXCLUDED.amount, updated_at = EXCLUDED.updated_at`,
-      [categoryIds.get(entry.category), entry.year, entry.month, entry.amount, Date.now()],
-    )
-  }
+    for (const cat of categories) {
+      // 재실행해도 카테고리가 중복 생성되지 않도록, 먼저 이름+그룹으로 기존 항목을 찾아 재사용한다.
+      const {
+        rows: [existing],
+      } = await client.query(`SELECT id FROM expense_categories WHERE name = $1 AND group_type = $2`, [
+        cat.name,
+        cat.groupType,
+      ])
+      if (existing) {
+        categoryIds.set(cat.name, existing.id)
+        continue
+      }
+      const {
+        rows: [row],
+      } = await client.query(
+        `INSERT INTO expense_categories (name, group_type, display_order, created_at)
+         VALUES ($1, $2, $3, $4) RETURNING id`,
+        [cat.name, cat.groupType, cat.displayOrder ?? 0, Date.now()],
+      )
+      categoryIds.set(cat.name, row.id)
+    }
 
-  await pool.query(
-    `INSERT INTO expense_settings (id, opening_year, opening_month, opening_balance, updated_at)
-     VALUES (1, $1, $2, $3, $4)
-     ON CONFLICT (id) DO UPDATE SET
-       opening_year = EXCLUDED.opening_year, opening_month = EXCLUDED.opening_month,
-       opening_balance = EXCLUDED.opening_balance, updated_at = EXCLUDED.updated_at`,
-    [raw.openingYear, raw.openingMonth, raw.openingBalance ?? 0, Date.now()],
-  )
+    for (const entry of entries) {
+      await client.query(
+        `INSERT INTO expense_entries (category_id, year, month, amount, updated_at)
+         VALUES ($1, $2, $3, $4, $5)
+         ON CONFLICT (category_id, year, month) DO UPDATE SET amount = EXCLUDED.amount, updated_at = EXCLUDED.updated_at`,
+        [categoryIds.get(entry.category), entry.year, entry.month, entry.amount, Date.now()],
+      )
+    }
+
+    await client.query(
+      `INSERT INTO expense_settings (id, opening_year, opening_month, opening_balance, updated_at)
+       VALUES (1, $1, $2, $3, $4)
+       ON CONFLICT (id) DO UPDATE SET
+         opening_year = EXCLUDED.opening_year, opening_month = EXCLUDED.opening_month,
+         opening_balance = EXCLUDED.opening_balance, updated_at = EXCLUDED.updated_at`,
+      [raw.openingYear, raw.openingMonth, raw.openingBalance ?? 0, Date.now()],
+    )
+
+    await client.query('COMMIT')
+  } catch (err) {
+    await client.query('ROLLBACK')
+    throw err
+  } finally {
+    client.release()
+  }
 
   console.log(`카테고리 ${categoryIds.size}개, 엔트리 ${entries.length}개 반영 완료`)
   await pool.end()
 }
 
 // 테스트에서 import할 때는 실행하지 않고, 직접 실행했을 때만 main()을 돈다.
-if (import.meta.url === `file://${process.argv[1]}`) {
+// (Windows에서 file://${process.argv[1]} 비교는 절대 일치하지 않으므로 pathToFileURL로 정규화해서 비교한다.)
+if (import.meta.url === pathToFileURL(process.argv[1]).href) {
   main().catch((err) => {
     console.error(err)
     process.exit(1)
