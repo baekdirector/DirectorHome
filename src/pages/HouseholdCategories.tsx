@@ -46,6 +46,7 @@ function CategoriesContent() {
       .filter((c) => c.groupType === cat.groupType && !c.archivedAt)
       .sort((a, b) => a.displayOrder - b.displayOrder)
     const index = siblings.findIndex((c) => c.id === cat.id)
+    if (index === -1) return
     const target = siblings[index + direction]
     if (!target) return
     await Promise.all([
