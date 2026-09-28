@@ -3,11 +3,13 @@ import { HouseholdGate } from '../components/HouseholdGate'
 import { HouseholdNav } from '../components/HouseholdNav'
 import { LoadError } from '../components/LoadError'
 import { Loading } from '../components/Loading'
+import { ChevronRightIcon } from '../components/icons'
 import {
   formatWon,
   findMonthSummary,
   getCategories,
   getEntries,
+  getSettings,
   getSummary,
   parseWonInput,
   putEntry,
@@ -53,12 +55,27 @@ function HouseholdContent() {
   const [entriesLoading, setEntriesLoading] = useState(true)
   const [entriesFailed, setEntriesFailed] = useState(false)
   const [saveError, setSaveError] = useState<{ categoryId: number; message: string } | null>(null)
+  const [openingYear, setOpeningYear] = useState<number | null>(null)
+  const [yearPickerOpen, setYearPickerOpen] = useState(false)
   // 연도를 빠르게 바꿀 때 이전 연도의 응답이 나중에 도착해 최신 화면을 덮어쓰지 않도록 "마지막 요청만 반영" 가드.
   const entriesRequestIdRef = useRef(0)
   const yearRef = useRef(year)
+  const monthStripRef = useRef<HTMLDivElement>(null)
+  const selectedMonthRef = useRef<HTMLButtonElement>(null)
   useEffect(() => {
     yearRef.current = year
   }, [year])
+
+  useEffect(() => {
+    getSettings().then((s) => setOpeningYear(s?.openingYear ?? now.getFullYear()))
+  }, [])
+
+  // 선택된 월 버튼이 항상 스크롤 영역 가운데에 오도록 맞춘다.
+  // categories/entries가 로딩 중일 때는 아직 버튼이 그려지지 않아 ref가 비어있으므로,
+  // 로딩이 끝나 실제 버튼이 그려진 뒤에도 다시 맞춰야 한다.
+  useEffect(() => {
+    selectedMonthRef.current?.scrollIntoView({ inline: 'center', block: 'nearest' })
+  }, [month, year, categories, entries])
 
   const retryCategories = async () => {
     setCategoriesFailed(false)
@@ -220,21 +237,45 @@ function HouseholdContent() {
       <HouseholdNav />
       <div className="flex-1 px-[22px] pb-8">
         <div className="flex items-center gap-2 pt-5">
-          <select
-            value={year}
-            onChange={(e) => setYear(Number(e.target.value))}
-            className="rounded-xl border border-border bg-surface px-2 py-1 text-[14px] font-semibold"
-          >
-            {[year - 1, year, year + 1].map((y) => (
-              <option key={y} value={y}>
-                {y}년
-              </option>
-            ))}
-          </select>
-          <div className="no-scrollbar flex flex-1 gap-1.5 overflow-x-auto">
+          <div className="relative flex-none">
+            <button
+              type="button"
+              onClick={() => setYearPickerOpen((v) => !v)}
+              className="flex items-center gap-1 rounded-xl border border-border bg-surface px-3 py-1.5 text-[14px] font-semibold"
+            >
+              {year}년
+              <ChevronRightIcon width={13} height={13} className="rotate-90 text-ink-muted" strokeWidth={2} />
+            </button>
+            {yearPickerOpen && (
+              <>
+                <div className="fixed inset-0 z-10" onClick={() => setYearPickerOpen(false)} />
+                <div className="absolute left-0 top-full z-20 mt-1.5 max-h-[240px] w-[110px] overflow-y-auto rounded-[14px] border border-border bg-surface py-1.5 shadow-[0_8px_24px_-8px_rgba(0,0,0,0.18)]">
+                  {Array.from({ length: now.getFullYear() - (openingYear ?? now.getFullYear()) + 1 }, (_, i) => (openingYear ?? now.getFullYear()) + i)
+                    .reverse()
+                    .map((y) => (
+                      <button
+                        key={y}
+                        type="button"
+                        onClick={() => {
+                          setYear(y)
+                          setYearPickerOpen(false)
+                        }}
+                        className={`block w-full px-3.5 py-2 text-left text-[14px] font-semibold ${
+                          y === year ? 'text-hh-pine' : 'text-ink'
+                        }`}
+                      >
+                        {y}년
+                      </button>
+                    ))}
+                </div>
+              </>
+            )}
+          </div>
+          <div ref={monthStripRef} className="no-scrollbar flex flex-1 gap-1.5 overflow-x-auto scroll-px-6 px-1">
             {Array.from({ length: 12 }, (_, i) => i + 1).map((m) => (
               <button
                 key={m}
+                ref={m === month ? selectedMonthRef : undefined}
                 onClick={() => setMonth(m)}
                 className={`flex-none rounded-full px-3 py-1.5 text-[13px] font-semibold ${
                   m === month ? 'bg-hh-pine text-white' : 'bg-surface text-ink-muted'
