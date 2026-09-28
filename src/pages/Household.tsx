@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { HouseholdGate } from '../components/HouseholdGate'
 import { HouseholdNav } from '../components/HouseholdNav'
+import { LoadError } from '../components/LoadError'
 import {
   formatWon,
   findMonthSummary,
@@ -47,14 +48,43 @@ function HouseholdContent() {
   const [entries, setEntries] = useState<ExpenseEntry[] | null>(null)
   const [summary, setSummary] = useState<ExpenseSummary | null>(null)
   const [inputs, setInputs] = useState<Record<number, string>>({})
+  const [categoriesFailed, setCategoriesFailed] = useState(false)
+  const [entriesLoading, setEntriesLoading] = useState(true)
+  const [entriesFailed, setEntriesFailed] = useState(false)
+  const [saveError, setSaveError] = useState<{ categoryId: number; message: string } | null>(null)
+
+  const retryCategories = async () => {
+    setCategoriesFailed(false)
+    try {
+      const data = await getCategories()
+      setCategories(data)
+    } catch (e) {
+      setCategoriesFailed(true)
+    }
+  }
+
+  const retryEntries = async () => {
+    setEntriesFailed(false)
+    setEntriesLoading(true)
+    try {
+      const [entriesData, summaryData] = await Promise.all([getEntries(year), getSummary(year)])
+      setEntries(entriesData)
+      setSummary(summaryData)
+    } catch (e) {
+      setEntriesFailed(true)
+    } finally {
+      setEntriesLoading(false)
+    }
+  }
 
   useEffect(() => {
-    getCategories().then(setCategories)
+    retryCategories()
   }, [])
 
   useEffect(() => {
-    getEntries(year).then(setEntries)
-    getSummary(year).then(setSummary)
+    setEntriesLoading(true)
+    setEntriesFailed(false)
+    retryEntries()
   }, [year])
 
   useEffect(() => {
@@ -78,11 +108,63 @@ function HouseholdContent() {
 
   const monthSummary = summary ? findMonthSummary(summary, month) : undefined
 
+  // Clear error message after 3 seconds
+  useEffect(() => {
+    if (!saveError) return
+    const timer = setTimeout(() => setSaveError(null), 3000)
+    return () => clearTimeout(timer)
+  }, [saveError])
+
   async function saveEntry(categoryId: number, raw: string) {
     const amount = parseWonInput(raw)
+    const previousValue = inputs[categoryId] ?? ''
+
     setInputs((prev) => ({ ...prev, [categoryId]: formatWon(amount) }))
-    await putEntry({ categoryId, year, month, amount })
-    getSummary(year).then(setSummary)
+    setSaveError(null)
+
+    try {
+      await putEntry({ categoryId, year, month, amount })
+      const newSummary = await getSummary(year)
+      setSummary(newSummary)
+    } catch (e) {
+      // Rollback: restore the previous value
+      setInputs((prev) => ({ ...prev, [categoryId]: previousValue }))
+      setSaveError({ categoryId, message: '저장에 실패했습니다.' })
+    }
+  }
+
+  if (categoriesFailed) {
+    return (
+      <div className="flex min-h-svh flex-col bg-bg">
+        <HouseholdNav />
+        <div className="flex-1">
+          <LoadError
+            screen={false}
+            message="항목 정보를 불러오지 못했어요."
+            onRetry={retryCategories}
+          />
+        </div>
+      </div>
+    )
+  }
+
+  if (!categories || entriesFailed) {
+    return (
+      <div className="flex min-h-svh flex-col bg-bg">
+        <HouseholdNav />
+        {!categories ? (
+          <div className="flex flex-1 items-center justify-center text-ink-muted">불러오는 중...</div>
+        ) : (
+          <div className="flex-1">
+            <LoadError
+              screen={false}
+              message="데이터를 불러오지 못했어요."
+              onRetry={retryEntries}
+            />
+          </div>
+        )}
+      </div>
+    )
   }
 
   if (!categories || !entries) {
@@ -147,15 +229,23 @@ function HouseholdContent() {
               <div key={cat.id} className="flex items-center gap-3 border-b border-hh-divider py-3.5">
                 <div className={`h-8 w-[3px] flex-none rounded-full ${GROUP_BAR_CLASS[group]}`} />
                 <div className="flex-1 text-[15px] font-medium">{cat.name}</div>
-                <input
-                  inputMode="numeric"
-                  value={inputs[cat.id] ?? ''}
-                  onChange={(e) => setInputs((prev) => ({ ...prev, [cat.id]: e.target.value }))}
-                  onFocus={(e) => e.target.select()}
-                  onBlur={(e) => saveEntry(cat.id, e.target.value)}
-                  placeholder="0"
-                  className="w-[120px] bg-transparent text-right text-[16px] font-semibold tabular-nums outline-none"
-                />
+                <div className="relative w-[120px] mb-4">
+                  <input
+                    inputMode="numeric"
+                    disabled={entriesLoading}
+                    value={inputs[cat.id] ?? ''}
+                    onChange={(e) => setInputs((prev) => ({ ...prev, [cat.id]: e.target.value }))}
+                    onFocus={(e) => e.target.select()}
+                    onBlur={(e) => saveEntry(cat.id, e.target.value)}
+                    placeholder="0"
+                    className="w-full bg-transparent text-right text-[16px] font-semibold tabular-nums outline-none disabled:opacity-50 disabled:cursor-not-allowed"
+                  />
+                  {saveError?.categoryId === cat.id && (
+                    <div className="absolute top-full right-0 mt-1 text-[12px] text-red-500 whitespace-nowrap">
+                      {saveError.message}
+                    </div>
+                  )}
+                </div>
               </div>
             ))}
           </div>
