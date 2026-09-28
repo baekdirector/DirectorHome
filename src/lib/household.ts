@@ -69,6 +69,12 @@ export const getEntries = (year: number) => api<ExpenseEntry[]>(`/entries?year=$
 export const putEntry = (input: { categoryId: number; year: number; month: number; amount: number; memo?: string }) =>
   api<{ id: number }>('/entries', { method: 'PUT', body: JSON.stringify(input) })
 
+/** 품목별로 줄을 쌓는 카테고리("추가 지출액" 등)에 새 품목 한 줄을 추가한다. 기존 줄은 건드리지 않는다. */
+export const createEntry = (input: { categoryId: number; year: number; month: number; amount: number; memo?: string }) =>
+  api<{ id: number }>('/entries', { method: 'POST', body: JSON.stringify(input) })
+
+export const deleteEntry = (id: number) => api<{ ok: true }>(`/entries/${id}`, { method: 'DELETE' })
+
 export const getSettings = () => api<ExpenseSettings | null>('/settings')
 
 export const putSettings = (input: ExpenseSettings) =>

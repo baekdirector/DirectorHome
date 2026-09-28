@@ -5,6 +5,8 @@ import { LoadError } from '../components/LoadError'
 import { Loading } from '../components/Loading'
 import { ChevronRightIcon } from '../components/icons'
 import {
+  createEntry,
+  deleteEntry,
   formatWon,
   findMonthSummary,
   getCategories,
@@ -18,6 +20,9 @@ import {
   type ExpenseGroup,
   type ExpenseSummary,
 } from '../lib/household'
+
+// 단일 값이 아니라 품목(날짜별 항목명+금액)을 여러 줄 쌓아서 합계를 보여주는 카테고리.
+const ITEMIZED_CATEGORY_NAMES = new Set(['추가 지출액', '추가 입금액'])
 
 const GROUP_ORDER: ExpenseGroup[] = ['income', 'fixed', 'card', 'utility', 'variable']
 const GROUP_LABEL: Record<ExpenseGroup, string> = {
@@ -116,12 +121,30 @@ function HouseholdContent() {
 
   useEffect(() => {
     if (!entries) return
-    const byCategory: Record<number, string> = {}
+    const sums: Record<number, number> = {}
     for (const e of entries) {
-      if (e.month === month) byCategory[e.categoryId] = formatWon(e.amount)
+      if (e.month === month) sums[e.categoryId] = (sums[e.categoryId] ?? 0) + e.amount
+    }
+    const byCategory: Record<number, string> = {}
+    for (const cat of categories ?? []) {
+      if (cat.id in sums) {
+        byCategory[cat.id] = formatWon(sums[cat.id])
+        continue
+      }
+      // 고정비는 이번 달 입력이 아직 없으면, 가장 최근 달 값을 화면에 미리 채워만 둔다.
+      // 저장하는 건 아니라서 사용자가 확인(blur)해야 실제로 기록된다.
+      if (cat.groupType === 'fixed') {
+        for (let m = month - 1; m >= 1; m--) {
+          const prior = entries.find((e) => e.categoryId === cat.id && e.month === m)
+          if (prior) {
+            byCategory[cat.id] = formatWon(prior.amount)
+            break
+          }
+        }
+      }
     }
     setInputs(byCategory)
-  }, [entries, month])
+  }, [entries, month, categories])
 
   const activeByGroup = useMemo(() => {
     const groups: Record<ExpenseGroup, ExpenseCategory[]> = { income: [], fixed: [], card: [], utility: [], variable: [] }
@@ -300,37 +323,149 @@ function HouseholdContent() {
         </div>
 
         {GROUP_ORDER.map((group) => (
-          <div key={group} className="mt-5">
+          <div
+            key={group}
+            className={`mt-5 ${group === 'income' ? 'rounded-[18px] bg-hh-gold-tint px-3.5 pb-1 pt-3.5' : ''}`}
+          >
             <div className="mb-1 text-[13px] font-semibold text-ink-muted">{GROUP_LABEL[group]}</div>
             {activeByGroup[group].length === 0 && (
               <p className="m-0 py-2 text-[13px] text-ink-muted">등록된 항목이 없어요.</p>
             )}
-            {activeByGroup[group].map((cat) => (
-              <div key={cat.id} className="flex items-center gap-3 border-b border-hh-divider py-3.5">
-                <div className={`h-8 w-[3px] flex-none rounded-full ${GROUP_BAR_CLASS[group]}`} />
-                <div className="flex-1 text-[15px] font-medium">{cat.name}</div>
-                <div className="relative w-[124px] mb-4">
-                  <input
-                    inputMode="numeric"
-                    disabled={entriesLoading}
-                    value={inputs[cat.id] ?? ''}
-                    onChange={(e) => setInputs((prev) => ({ ...prev, [cat.id]: e.target.value }))}
-                    onFocus={(e) => e.target.select()}
-                    onBlur={(e) => saveEntry(cat.id, e.target.value)}
-                    placeholder="0"
-                    className="w-full rounded-[10px] border border-border bg-surface-alt px-2.5 py-2 text-right text-[16px] font-semibold tabular-nums outline-none focus:border-hh-pine focus:bg-surface disabled:opacity-50 disabled:cursor-not-allowed"
-                  />
-                  {saveError?.categoryId === cat.id && (
-                    <div className="absolute top-full right-0 mt-1 text-[12px] text-red-500 whitespace-nowrap">
-                      {saveError.message}
-                    </div>
-                  )}
+            {activeByGroup[group].map((cat) =>
+              ITEMIZED_CATEGORY_NAMES.has(cat.name) ? (
+                <ItemizedRow
+                  key={cat.id}
+                  category={cat}
+                  year={year}
+                  month={month}
+                  items={(entries ?? []).filter((e) => e.categoryId === cat.id && e.month === month)}
+                  barClass={GROUP_BAR_CLASS[group]}
+                  onChanged={retryEntries}
+                />
+              ) : (
+                <div key={cat.id} className="flex items-center gap-3 border-b border-hh-divider py-3.5">
+                  <div className={`h-8 w-[3px] flex-none rounded-full ${GROUP_BAR_CLASS[group]}`} />
+                  <div className="flex-1 text-[15px] font-medium">{cat.name}</div>
+                  <div className="relative w-[124px] mb-4">
+                    <input
+                      inputMode="numeric"
+                      disabled={entriesLoading}
+                      value={inputs[cat.id] ?? ''}
+                      onChange={(e) => setInputs((prev) => ({ ...prev, [cat.id]: e.target.value }))}
+                      onFocus={(e) => e.target.select()}
+                      onBlur={(e) => saveEntry(cat.id, e.target.value)}
+                      placeholder="0"
+                      className="w-full rounded-[10px] border border-border bg-surface-alt px-2.5 py-2 text-right text-[16px] font-semibold tabular-nums outline-none focus:border-hh-pine focus:bg-surface disabled:opacity-50 disabled:cursor-not-allowed"
+                    />
+                    {saveError?.categoryId === cat.id && (
+                      <div className="absolute top-full right-0 mt-1 text-[12px] text-red-500 whitespace-nowrap">
+                        {saveError.message}
+                      </div>
+                    )}
+                  </div>
                 </div>
-              </div>
-            ))}
+              ),
+            )}
           </div>
         ))}
       </div>
+    </div>
+  )
+}
+
+/** "추가 지출액"처럼 품목(항목명+금액)을 여러 줄 쌓아서 합계를 보여주는 카테고리 한 줄. */
+function ItemizedRow({
+  category,
+  year,
+  month,
+  items,
+  barClass,
+  onChanged,
+}: {
+  category: ExpenseCategory
+  year: number
+  month: number
+  items: ExpenseEntry[]
+  barClass: string
+  onChanged: () => void
+}) {
+  const [open, setOpen] = useState(false)
+  const [label, setLabel] = useState('')
+  const [amount, setAmount] = useState('')
+  const [saving, setSaving] = useState(false)
+  const total = items.reduce((sum, it) => sum + it.amount, 0)
+
+  async function addItem() {
+    const parsed = parseWonInput(amount)
+    if (!label.trim() || parsed <= 0) return
+    setSaving(true)
+    try {
+      await createEntry({ categoryId: category.id, year, month, amount: parsed, memo: label.trim() })
+      setLabel('')
+      setAmount('')
+      onChanged()
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  async function removeItem(id: number) {
+    await deleteEntry(id)
+    onChanged()
+  }
+
+  return (
+    <div className="border-b border-hh-divider py-3.5">
+      <button type="button" onClick={() => setOpen((v) => !v)} className="flex w-full items-center gap-3">
+        <div className={`h-8 w-[3px] flex-none rounded-full ${barClass}`} />
+        <div className="flex-1 text-left text-[15px] font-medium">{category.name}</div>
+        <div className="rounded-[10px] border border-border bg-surface-alt px-2.5 py-2 text-right text-[16px] font-semibold tabular-nums">
+          {formatWon(total)}
+        </div>
+        <ChevronRightIcon
+          width={14}
+          height={14}
+          className={`flex-none text-ink-muted transition-transform ${open ? 'rotate-90' : ''}`}
+        />
+      </button>
+
+      {open && (
+        <div className="mt-3 pl-[19px]">
+          {items.length === 0 && <p className="m-0 pb-2 text-[13px] text-ink-muted">등록된 품목이 없어요.</p>}
+          {items.map((it) => (
+            <div key={it.id} className="flex items-center gap-2 py-1.5 text-[14px]">
+              <div className="flex-1 text-ink-muted">{it.memo || '(이름 없음)'}</div>
+              <div className="font-medium tabular-nums">{formatWon(it.amount)}원</div>
+              <button type="button" onClick={() => removeItem(it.id)} className="px-1 text-ink-muted" aria-label="품목 삭제">
+                ✕
+              </button>
+            </div>
+          ))}
+          <div className="mt-2 flex gap-1.5">
+            <input
+              value={label}
+              onChange={(e) => setLabel(e.target.value)}
+              placeholder="항목명"
+              className="min-w-0 flex-1 rounded-[10px] border border-border bg-surface px-2.5 py-2 text-[14px] outline-none focus:border-hh-pine"
+            />
+            <input
+              inputMode="numeric"
+              value={amount}
+              onChange={(e) => setAmount(e.target.value)}
+              placeholder="금액"
+              className="w-[90px] flex-none rounded-[10px] border border-border bg-surface px-2.5 py-2 text-right text-[14px] tabular-nums outline-none focus:border-hh-pine"
+            />
+            <button
+              type="button"
+              onClick={addItem}
+              disabled={saving}
+              className="flex-none rounded-[10px] bg-hh-pine px-3.5 text-[14px] font-bold text-white disabled:opacity-50"
+            >
+              추가
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

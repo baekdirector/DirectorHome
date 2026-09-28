@@ -86,6 +86,9 @@ export async function migrate() {
 
     -- 카드값처럼 같은 항목이라도 매달 금액이 달라지는 것과, 월급처럼 매달 들어오는 것 모두
     -- category_id + year + month 한 줄로 표현한다.
+    -- 보통은 카테고리당 월 하나에 금액 한 줄이지만("추가 지출액"처럼 품목별로 여러 줄을 쌓는
+    -- 카테고리도 있어서(각 줄이 memo=품목명 하나) UNIQUE 제약은 두지 않는다. 한 줄짜리 카테고리의
+    -- "값 하나만 유지" 규칙은 서버(교체 후 삽입)에서 지킨다.
     CREATE TABLE IF NOT EXISTS expense_entries (
       id SERIAL PRIMARY KEY,
       category_id INTEGER NOT NULL REFERENCES expense_categories(id) ON DELETE CASCADE,
@@ -93,8 +96,7 @@ export async function migrate() {
       month INTEGER NOT NULL CHECK (month BETWEEN 1 AND 12),
       amount BIGINT NOT NULL DEFAULT 0,
       memo TEXT,
-      updated_at BIGINT NOT NULL,
-      UNIQUE (category_id, year, month)
+      updated_at BIGINT NOT NULL
     );
 
     -- "전달 남은 돈"처럼 이월 잔액을 계산하려면 기록이 시작되기 전 시점의 잔액(기준점)이 필요하다.
@@ -110,6 +112,9 @@ export async function migrate() {
     CREATE INDEX IF NOT EXISTS idx_expense_categories_group_type ON expense_categories(group_type);
     CREATE INDEX IF NOT EXISTS idx_expense_entries_year_month ON expense_entries(year, month);
     CREATE INDEX IF NOT EXISTS idx_expense_entries_category_id ON expense_entries(category_id);
+
+    -- 기존 DB에 남아있던 "카테고리당 월 하나" UNIQUE 제약을 제거한다(품목별 다중 입력을 허용하기 위해).
+    ALTER TABLE expense_entries DROP CONSTRAINT IF EXISTS expense_entries_category_id_year_month_key;
   `)
 
   // 오답 노트 기능 이전의 틀린 기록으로 노트를 채운다. 이미 노트에 있는 단어는 건드리지 않는다.

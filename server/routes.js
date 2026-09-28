@@ -416,23 +416,54 @@ router.get('/expense/entries', async (req, res) => {
   if (!year) return res.status(400).json({ error: 'year required' })
   const { rows } = await pool.query(
     `SELECT id, category_id AS "categoryId", year, month, amount, memo, updated_at AS "updatedAt"
-     FROM expense_entries WHERE year = $1`,
+     FROM expense_entries WHERE year = $1
+     ORDER BY id`,
     [year],
   )
   res.json(rows)
 })
 
+// 카테고리당 월 하나의 값만 갖는 일반 입력칸용: 기존 줄을 지우고 하나를 새로 넣어
+// "이 카테고리+이 달은 항상 한 줄"을 유지한다("추가 지출액"처럼 품목별로 여러 줄을 쌓는
+// 카테고리는 이 엔드포인트를 쓰지 않고 아래 POST를 쓴다).
 router.put('/expense/entries', async (req, res) => {
+  const { categoryId, year, month, amount, memo } = req.body
+  if (!categoryId || !year || !month) return res.status(400).json({ error: 'categoryId, year, month required' })
+  const client = await pool.connect()
+  try {
+    await client.query('BEGIN')
+    await client.query(`DELETE FROM expense_entries WHERE category_id = $1 AND year = $2 AND month = $3`, [
+      categoryId,
+      year,
+      month,
+    ])
+    const {
+      rows: [row],
+    } = await client.query(
+      `INSERT INTO expense_entries (category_id, year, month, amount, memo, updated_at)
+       VALUES ($1, $2, $3, $4, $5, $6) RETURNING id`,
+      [categoryId, year, month, amount ?? 0, memo ?? null, Date.now()],
+    )
+    await client.query('COMMIT')
+    res.json({ id: row.id })
+  } catch (err) {
+    await client.query('ROLLBACK')
+    throw err
+  } finally {
+    client.release()
+  }
+})
+
+// 품목별로 여러 줄을 쌓는 카테고리("추가 지출액"/"추가 입금액")용: 기존 줄을 건드리지 않고
+// 새 품목 한 줄을 추가한다.
+router.post('/expense/entries', async (req, res) => {
   const { categoryId, year, month, amount, memo } = req.body
   if (!categoryId || !year || !month) return res.status(400).json({ error: 'categoryId, year, month required' })
   const {
     rows: [row],
   } = await pool.query(
     `INSERT INTO expense_entries (category_id, year, month, amount, memo, updated_at)
-     VALUES ($1, $2, $3, $4, $5, $6)
-     ON CONFLICT (category_id, year, month) DO UPDATE SET
-       amount = EXCLUDED.amount, memo = EXCLUDED.memo, updated_at = EXCLUDED.updated_at
-     RETURNING id`,
+     VALUES ($1, $2, $3, $4, $5, $6) RETURNING id`,
     [categoryId, year, month, amount ?? 0, memo ?? null, Date.now()],
   )
   res.json({ id: row.id })
