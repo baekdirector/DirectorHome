@@ -19,6 +19,7 @@ dist-ssr
 .idea
 .DS_Store
 .superpowers/
+.worktrees/
 *.suo
 *.ntvs*
 *.njsproj
