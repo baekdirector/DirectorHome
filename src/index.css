@@ -29,6 +29,15 @@
   --color-gold: #a5790a;
   --color-gold-tint: #fbf1da;
 
+  --color-hh-pine: #123A34;
+  --color-hh-pine-tint: #E3E7E1;
+  --color-hh-clay: #A2432E;
+  --color-hh-clay-tint: #F3DFD8;
+  --color-hh-gold: #B98A3D;
+  --color-hh-gold-tint: #F4E9D2;
+  --color-hh-neutral: #8a8674;
+  --color-hh-divider: #eee7d6;
+
   --font-kr: 'Noto Sans KR', system-ui, sans-serif;
   /* 영어 단어용: 읽기를 배우는 아이들을 위해 만든 글꼴 (a가 한 층, I/l/1 구분이 확실) */
   --font-display: 'Andika', 'Noto Sans KR', system-ui, sans-serif;
