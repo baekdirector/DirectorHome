@@ -360,3 +360,162 @@ router.get('/home-stats', async (_req, res) => {
 
   res.json({ totalWords, totalAttempts: attempts.length, weeklyAccuracy, streakDays, wrongNoteCount })
 })
+
+// ---- household expense tracker ----
+
+router.get('/expense/categories', async (_req, res) => {
+  const { rows } = await pool.query(`
+    SELECT id, name, group_type AS "groupType", display_order AS "displayOrder",
+           created_at AS "createdAt", archived_at AS "archivedAt"
+    FROM expense_categories
+    ORDER BY archived_at NULLS FIRST, group_type, display_order, id
+  `)
+  res.json(rows)
+})
+
+router.post('/expense/categories', async (req, res) => {
+  const { name, groupType, displayOrder } = req.body
+  if (!name || !groupType) return res.status(400).json({ error: 'name and groupType required' })
+  const {
+    rows: [row],
+  } = await pool.query(
+    `INSERT INTO expense_categories (name, group_type, display_order, created_at) VALUES ($1, $2, $3, $4) RETURNING id`,
+    [name, groupType, displayOrder ?? 0, Date.now()],
+  )
+  res.json({ id: row.id })
+})
+
+router.patch('/expense/categories/:id', async (req, res) => {
+  const { name, groupType, displayOrder, archived } = req.body
+  await pool.query(
+    `UPDATE expense_categories SET
+       name = COALESCE($1, name),
+       group_type = COALESCE($2, group_type),
+       display_order = COALESCE($3, display_order),
+       archived_at = CASE WHEN $4::boolean IS NULL THEN archived_at WHEN $4 THEN COALESCE(archived_at, $5::bigint) ELSE NULL END
+     WHERE id = $6`,
+    [name, groupType, displayOrder, typeof archived === 'boolean' ? archived : null, Date.now(), req.params.id],
+  )
+  res.json({ ok: true })
+})
+
+// ---- expense entries (one row per category per year+month) ----
+
+router.get('/expense/entries', async (req, res) => {
+  const year = Number(req.query.year)
+  if (!year) return res.status(400).json({ error: 'year required' })
+  const { rows } = await pool.query(
+    `SELECT id, category_id AS "categoryId", year, month, amount, memo, updated_at AS "updatedAt"
+     FROM expense_entries WHERE year = $1`,
+    [year],
+  )
+  res.json(rows)
+})
+
+router.put('/expense/entries', async (req, res) => {
+  const { categoryId, year, month, amount, memo } = req.body
+  if (!categoryId || !year || !month) return res.status(400).json({ error: 'categoryId, year, month required' })
+  const {
+    rows: [row],
+  } = await pool.query(
+    `INSERT INTO expense_entries (category_id, year, month, amount, memo, updated_at)
+     VALUES ($1, $2, $3, $4, $5, $6)
+     ON CONFLICT (category_id, year, month) DO UPDATE SET
+       amount = EXCLUDED.amount, memo = EXCLUDED.memo, updated_at = EXCLUDED.updated_at
+     RETURNING id`,
+    [categoryId, year, month, amount ?? 0, memo ?? null, Date.now()],
+  )
+  res.json({ id: row.id })
+})
+
+router.delete('/expense/entries/:id', async (req, res) => {
+  await pool.query(`DELETE FROM expense_entries WHERE id = $1`, [req.params.id])
+  res.json({ ok: true })
+})
+
+// ---- expense settings: opening balance anchor for carry-forward math ----
+
+router.get('/expense/settings', async (_req, res) => {
+  const { rows } = await pool.query(
+    `SELECT opening_year AS "openingYear", opening_month AS "openingMonth", opening_balance AS "openingBalance"
+     FROM expense_settings WHERE id = 1`,
+  )
+  res.json(rows[0] ?? null)
+})
+
+router.put('/expense/settings', async (req, res) => {
+  const { openingYear, openingMonth, openingBalance } = req.body
+  if (!openingYear || !openingMonth) return res.status(400).json({ error: 'openingYear and openingMonth required' })
+  await pool.query(
+    `INSERT INTO expense_settings (id, opening_year, opening_month, opening_balance, updated_at)
+     VALUES (1, $1, $2, $3, $4)
+     ON CONFLICT (id) DO UPDATE SET
+       opening_year = EXCLUDED.opening_year, opening_month = EXCLUDED.opening_month,
+       opening_balance = EXCLUDED.opening_balance, updated_at = EXCLUDED.updated_at`,
+    [openingYear, openingMonth, openingBalance ?? 0, Date.now()],
+  )
+  res.json({ ok: true })
+})
+
+/**
+ * 연간 요약: 월별 수입/카드값/고정비·저축/통신·공과/기타지출 합계와, 시작 잔액(opening_balance)부터
+ * 이어지는 이월 잔액(총 합계)을 계산한다. 시작 시점부터 요청 연도 12월까지 누적해야 잔액이
+ * 정확하므로, DB에서 그 구간 전체를 읽어 JS에서 월별로 접는다(가계부 규모상 충분히 가볍다).
+ */
+router.get('/expense/summary', async (req, res) => {
+  const year = Number(req.query.year)
+  if (!year) return res.status(400).json({ error: 'year required' })
+
+  const { rows: settingsRows } = await pool.query(
+    `SELECT opening_year AS "openingYear", opening_month AS "openingMonth", opening_balance AS "openingBalance"
+     FROM expense_settings WHERE id = 1`,
+  )
+  const settings = settingsRows[0] ?? { openingYear: year, openingMonth: 1, openingBalance: 0 }
+
+  const { rows: entries } = await pool.query(
+    `SELECT e.year, e.month, e.amount, c.group_type AS "groupType"
+     FROM expense_entries e JOIN expense_categories c ON c.id = e.category_id
+     WHERE (e.year, e.month) >= ($1, $2) AND (e.year, e.month) <= ($3, 12)`,
+    [settings.openingYear, settings.openingMonth, year],
+  )
+
+  const byMonth = new Map()
+  for (const e of entries) {
+    const key = `${e.year}-${e.month}`
+    const m = byMonth.get(key) ?? { income: 0, card: 0, fixed: 0, utility: 0, variable: 0 }
+    m[e.groupType] += Number(e.amount)
+    byMonth.set(key, m)
+  }
+
+  let balance = Number(settings.openingBalance)
+  const months = []
+  let y = settings.openingYear
+  let m = settings.openingMonth
+  while (y < year || (y === year && m <= 12)) {
+    const entry = byMonth.get(`${y}-${m}`) ?? { income: 0, card: 0, fixed: 0, utility: 0, variable: 0 }
+    const expenseTotal = entry.card + entry.fixed + entry.utility + entry.variable
+    const net = entry.income - expenseTotal
+    balance += net
+    if (y === year) {
+      months.push({
+        year: y,
+        month: m,
+        income: entry.income,
+        cardTotal: entry.card,
+        fixedTotal: entry.fixed,
+        utilityTotal: entry.utility,
+        variableTotal: entry.variable,
+        expenseTotal,
+        net,
+        balance,
+      })
+    }
+    m += 1
+    if (m > 12) {
+      m = 1
+      y += 1
+    }
+  }
+
+  res.json({ months, openingBalance: Number(settings.openingBalance) })
+})

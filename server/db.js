@@ -71,6 +71,45 @@ export async function migrate() {
     CREATE INDEX IF NOT EXISTS idx_quiz_sessions_group_id ON quiz_sessions(group_id);
     CREATE INDEX IF NOT EXISTS idx_quiz_sessions_started_at ON quiz_sessions(started_at);
     CREATE INDEX IF NOT EXISTS idx_quiz_answers_session_id ON quiz_answers(session_id);
+
+    -- ---- household expense tracker ----
+    -- 하나의 "항목"(예: 현대카드, 월급, 인터넷+TV)이 매달 하나의 금액을 가진다.
+    -- group_type으로 카드값/고정비·저축/통신·공과/기타지출/수입을 구분해 통계에서 묶어 낸다.
+    CREATE TABLE IF NOT EXISTS expense_categories (
+      id SERIAL PRIMARY KEY,
+      name TEXT NOT NULL,
+      group_type TEXT NOT NULL CHECK (group_type IN ('income', 'fixed', 'card', 'utility', 'variable')),
+      display_order INTEGER NOT NULL DEFAULT 0,
+      created_at BIGINT NOT NULL,
+      archived_at BIGINT
+    );
+
+    -- 카드값처럼 같은 항목이라도 매달 금액이 달라지는 것과, 월급처럼 매달 들어오는 것 모두
+    -- category_id + year + month 한 줄로 표현한다.
+    CREATE TABLE IF NOT EXISTS expense_entries (
+      id SERIAL PRIMARY KEY,
+      category_id INTEGER NOT NULL REFERENCES expense_categories(id) ON DELETE CASCADE,
+      year INTEGER NOT NULL,
+      month INTEGER NOT NULL CHECK (month BETWEEN 1 AND 12),
+      amount BIGINT NOT NULL DEFAULT 0,
+      memo TEXT,
+      updated_at BIGINT NOT NULL,
+      UNIQUE (category_id, year, month)
+    );
+
+    -- "전달 남은 돈"처럼 이월 잔액을 계산하려면 기록이 시작되기 전 시점의 잔액(기준점)이 필요하다.
+    -- 앱 전체에 하나만 있으므로 id=1 고정.
+    CREATE TABLE IF NOT EXISTS expense_settings (
+      id INTEGER PRIMARY KEY DEFAULT 1 CHECK (id = 1),
+      opening_year INTEGER NOT NULL,
+      opening_month INTEGER NOT NULL CHECK (opening_month BETWEEN 1 AND 12),
+      opening_balance BIGINT NOT NULL DEFAULT 0,
+      updated_at BIGINT NOT NULL
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_expense_categories_group_type ON expense_categories(group_type);
+    CREATE INDEX IF NOT EXISTS idx_expense_entries_year_month ON expense_entries(year, month);
+    CREATE INDEX IF NOT EXISTS idx_expense_entries_category_id ON expense_entries(category_id);
   `)
 
   // 오답 노트 기능 이전의 틀린 기록으로 노트를 채운다. 이미 노트에 있는 단어는 건드리지 않는다.
