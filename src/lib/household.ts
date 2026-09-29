@@ -73,6 +73,10 @@ export const putEntry = (input: { categoryId: number; year: number; month: numbe
 export const createEntry = (input: { categoryId: number; year: number; month: number; amount: number; memo?: string }) =>
   api<{ id: number }>('/entries', { method: 'POST', body: JSON.stringify(input) })
 
+/** 품목 한 줄의 이름/금액을 수정한다(추가/삭제가 아니라 같은 줄을 고칠 때). */
+export const updateEntry = (id: number, input: { amount: number; memo?: string }) =>
+  api<{ ok: true }>(`/entries/${id}`, { method: 'PATCH', body: JSON.stringify(input) })
+
 export const deleteEntry = (id: number) => api<{ ok: true }>(`/entries/${id}`, { method: 'DELETE' })
 
 export const getSettings = () => api<ExpenseSettings | null>('/settings')

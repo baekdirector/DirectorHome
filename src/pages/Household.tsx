@@ -16,6 +16,7 @@ import {
   getSummary,
   parseWonInput,
   putEntry,
+  updateEntry,
   type ExpenseCategory,
   type ExpenseEntry,
   type ExpenseGroup,
@@ -142,6 +143,8 @@ function HouseholdContent() {
   const income = monthSummary?.income ?? 0
   const expenseTotal = monthSummary?.expenseTotal ?? 0
   const netThisMonth = monthSummary?.net ?? 0
+  // 이번 달이 시작될 때(=전달 말) 갖고 있던 잔액. balance는 이번 달 순증감까지 반영된 값이라 빼서 구한다.
+  const carriedIn = monthSummary ? monthSummary.balance - monthSummary.net : openingBalance
   const savingsRate = income > 0 ? (netThisMonth / income) * 100 : 0
   const prevSavingsRate =
     prevMonthSummary && prevMonthSummary.income > 0 ? (prevMonthSummary.net / prevMonthSummary.income) * 100 : null
@@ -323,11 +326,7 @@ function HouseholdContent() {
         <div className="flex flex-col gap-[18px] rounded-[28px] bg-hh-pine p-6 text-white shadow-[0_18px_40px_-24px_rgba(34,67,59,0.7)]">
           <div className="flex items-center justify-between">
             <div className="text-[14px] text-[#CFDDD5]">이번 달 남은 돈</div>
-            {income > 0 && (
-              <div className="rounded-full bg-[#E3ECE6] px-2.5 py-1 text-[12px] font-semibold text-hh-pine">
-                저축률 {savingsRate.toFixed(1)}%
-              </div>
-            )}
+            <div className="text-[12px] text-[#CFDDD5]">전달 이월 {formatWon(carriedIn)}원</div>
           </div>
           <div className="flex items-baseline gap-1.5">
             <div className="text-[40px] font-bold tracking-tight">{formatWon(monthSummary?.balance ?? openingBalance)}</div>
@@ -614,6 +613,9 @@ function ItemizedRow({
   const [label, setLabel] = useState('')
   const [amount, setAmount] = useState('')
   const [saving, setSaving] = useState(false)
+  const [editingId, setEditingId] = useState<number | null>(null)
+  const [editLabel, setEditLabel] = useState('')
+  const [editAmount, setEditAmount] = useState('')
   const total = items.reduce((sum, it) => sum + it.amount, 0)
 
   async function addItem() {
@@ -624,6 +626,24 @@ function ItemizedRow({
       await createEntry({ categoryId: category.id, year, month, amount: parsed, memo: label.trim() })
       setLabel('')
       setAmount('')
+      onChanged()
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  function startEdit(it: ExpenseEntry) {
+    setEditingId(it.id)
+    setEditLabel(it.memo ?? '')
+    setEditAmount(formatWon(it.amount))
+  }
+
+  async function saveEdit(id: number) {
+    const parsed = parseWonInput(editAmount)
+    setSaving(true)
+    try {
+      await updateEntry(id, { amount: parsed, memo: editLabel.trim() })
+      setEditingId(null)
       onChanged()
     } finally {
       setSaving(false)
@@ -660,15 +680,47 @@ function ItemizedRow({
       {open && (
         <div className="flex flex-col gap-1.5 px-3 pb-3">
           {items.length === 0 && <p className="m-0 pb-1 text-[13px] text-hh-ink-muted">등록된 품목이 없어요.</p>}
-          {items.map((it) => (
-            <div key={it.id} className="flex items-center gap-2 py-1 text-[14px]">
-              <div className="flex-1 text-hh-ink-muted">{it.memo || '(이름 없음)'}</div>
-              <div className="font-medium tabular-nums">{formatWon(it.amount)}원</div>
-              <button type="button" onClick={() => removeItem(it.id)} className="px-1 text-hh-ink-muted" aria-label="품목 삭제">
-                ✕
-              </button>
-            </div>
-          ))}
+          {items.map((it) =>
+            editingId === it.id ? (
+              <div key={it.id} className="flex gap-1.5 py-1">
+                <input
+                  value={editLabel}
+                  onChange={(e) => setEditLabel(e.target.value)}
+                  placeholder="항목명"
+                  className="min-w-0 flex-1 rounded-[10px] border border-hh-pine bg-white px-2.5 py-1.5 text-[14px] outline-none"
+                />
+                <input
+                  inputMode="numeric"
+                  value={editAmount}
+                  onChange={(e) => setEditAmount(e.target.value)}
+                  onFocus={(e) => e.target.select()}
+                  className="w-[90px] flex-none rounded-[10px] border border-hh-pine bg-white px-2.5 py-1.5 text-right text-[14px] tabular-nums outline-none"
+                />
+                <button
+                  type="button"
+                  onClick={() => saveEdit(it.id)}
+                  disabled={saving}
+                  className="flex-none rounded-[10px] bg-hh-pine px-3 text-[13px] font-bold text-white disabled:opacity-50"
+                >
+                  저장
+                </button>
+              </div>
+            ) : (
+              <div key={it.id} className="flex items-center gap-2 py-1 text-[14px]">
+                <button
+                  type="button"
+                  onClick={() => startEdit(it)}
+                  className="flex min-w-0 flex-1 items-center gap-2 border-none bg-transparent p-0 text-left"
+                >
+                  <div className="flex-1 truncate text-hh-ink-muted">{it.memo || '(이름 없음)'}</div>
+                  <div className="font-medium tabular-nums">{formatWon(it.amount)}원</div>
+                </button>
+                <button type="button" onClick={() => removeItem(it.id)} className="px-1 text-hh-ink-muted" aria-label="품목 삭제">
+                  ✕
+                </button>
+              </div>
+            ),
+          )}
           <div className="mt-1 flex gap-1.5">
             <input
               value={label}

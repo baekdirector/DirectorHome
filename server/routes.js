@@ -469,6 +469,16 @@ router.post('/expense/entries', async (req, res) => {
   res.json({ id: row.id })
 })
 
+// 품목 한 줄(주로 "추가 지출액"/"추가 입금액")의 이름/금액을 수정한다.
+router.patch('/expense/entries/:id', async (req, res) => {
+  const { amount, memo } = req.body
+  await pool.query(
+    `UPDATE expense_entries SET amount = $1, memo = $2, updated_at = $3 WHERE id = $4`,
+    [amount ?? 0, memo ?? null, Date.now(), req.params.id],
+  )
+  res.json({ ok: true })
+})
+
 router.delete('/expense/entries/:id', async (req, res) => {
   await pool.query(`DELETE FROM expense_entries WHERE id = $1`, [req.params.id])
   res.json({ ok: true })
