@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { ConfirmDialog } from './ConfirmDialog'
+import { closeTopHouseholdOverlay } from '../lib/householdOverlay'
 
 /**
  * 가계부(/household*) 화면에서 브라우저/기기 뒤로가기를 눌러 JunsVoca로 넘어가려 할 때
@@ -28,6 +29,11 @@ export function HouseholdBackGuard() {
   useEffect(() => {
     function onPopState() {
       if (!armedRef.current) return
+      // 금액 수정 팝업 등 열려있는 오버레이가 있으면, 나가기 확인 대신 그것부터 닫는다.
+      if (closeTopHouseholdOverlay()) {
+        window.history.pushState(null, '', window.location.href)
+        return
+      }
       armedRef.current = false
       setConfirming(true)
     }

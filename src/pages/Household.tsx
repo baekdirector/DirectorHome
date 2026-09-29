@@ -6,6 +6,7 @@ import { HouseholdBottomNav } from '../components/HouseholdBottomNav'
 import { LoadError } from '../components/LoadError'
 import { Loading } from '../components/Loading'
 import { EditEntryModal } from '../components/EditEntryModal'
+import { registerHouseholdOverlay } from '../lib/householdOverlay'
 import {
   createEntry,
   deleteEntry,
@@ -64,6 +65,16 @@ function HouseholdContent() {
   const [editing, setEditing] = useState<ExpenseCategory | null>(null)
   const [saving, setSaving] = useState(false)
   const entriesRequestIdRef = useRef(0)
+
+  // 뒤로가기를 눌렀을 때 가계부를 나가는 대신 열려있는 팝업부터 닫히게 등록한다.
+  useEffect(() => {
+    if (!editing) return
+    return registerHouseholdOverlay(() => setEditing(null))
+  }, [editing])
+  useEffect(() => {
+    if (!pickerOpen) return
+    return registerHouseholdOverlay(() => setPickerOpen(false))
+  }, [pickerOpen])
 
   const retryCategories = async () => {
     setCategoriesFailed(false)
