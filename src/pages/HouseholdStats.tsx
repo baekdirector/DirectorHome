@@ -27,6 +27,12 @@ function man(n: number) {
   return `${Math.round(n / 10000).toLocaleString('ko-KR')}만`
 }
 
+/** 최근 N개월 비교 막대의 명도: 가장 오래된 달은 흐리게, 이번 달은 진하게. */
+function monthOpacity(index: number, total: number) {
+  if (total <= 1) return 1
+  return 0.45 + (0.55 * index) / (total - 1)
+}
+
 export function HouseholdStats() {
   return (
     <HouseholdGate>
@@ -81,6 +87,9 @@ function StatsContent() {
 
   const monthsElapsed = year === now.getFullYear() ? now.getMonth() + 1 : 12
   const currentMonthIdx = monthsElapsed - 1
+  // 이번 달을 포함해 최근 3개월(예: 7,8,9월). 연초라 3개월이 안 되면 있는 만큼만.
+  const currentMonth = currentMonthIdx + 1
+  const recentMonths = [currentMonth - 2, currentMonth - 1, currentMonth].filter((m) => m >= 1)
 
   const spends = useMemo(() => (months ?? []).map((m) => m.expenseTotal), [months])
   const incomes = useMemo(() => (months ?? []).map((m) => m.income), [months])
@@ -274,42 +283,41 @@ function StatsContent() {
               </div>
             )}
 
-            {cardCategories.length > 0 && currentMonthIdx > 0 && (
+            {cardCategories.length > 0 && (
               <div className="flex flex-col gap-4 rounded-[24px] bg-white p-5">
                 <div className="flex items-baseline justify-between">
-                  <div className="font-hh-serif text-[18px] font-bold">카드별 전월 비교</div>
+                  <div className="font-hh-serif text-[18px] font-bold">카드별 최근 3개월 비교</div>
                   <div className="flex gap-2.5 text-[11px] text-hh-ink-muted">
-                    <div className="flex items-center gap-1">
-                      <div className="h-1 w-2.5 rounded-sm bg-[#D8D1C4]" />
-                      {currentMonthIdx}월
-                    </div>
-                    <div className="flex items-center gap-1">
-                      <div className="h-1 w-2.5 rounded-sm bg-hh-pine" />
-                      {currentMonthIdx + 1}월
-                    </div>
+                    {recentMonths.map((m, i) => (
+                      <div key={m} className="flex items-center gap-1">
+                        <div className="h-2.5 w-2.5 rounded-[3px]" style={{ background: '#22433B', opacity: monthOpacity(i, recentMonths.length) }} />
+                        {m}월
+                      </div>
+                    ))}
                   </div>
                 </div>
                 {cardCategories.map(({ cat, color }) => {
-                  const cur = sumFor(cat.id, currentMonthIdx + 1)
-                  const prev = sumFor(cat.id, currentMonthIdx)
-                  const max = Math.max(cur, prev, 1)
-                  const delta = prev > 0 ? ((cur - prev) / prev) * 100 : null
+                  const rows = recentMonths.map((m) => ({ month: m, amount: sumFor(cat.id, m) }))
+                  const max = Math.max(1, ...rows.map((r) => r.amount))
                   return (
-                    <div key={cat.id} className="flex flex-col gap-1.5">
-                      <div className="flex items-baseline justify-between">
-                        <div className="text-[14px] font-medium">{cat.name}</div>
-                        <div className="flex items-baseline gap-2">
-                          <div className="text-[14px] font-semibold">{formatWon(cur)}</div>
-                          {delta !== null && (
-                            <div className="text-[12px] font-semibold" style={{ color: delta > 0 ? 'var(--color-hh-up)' : 'var(--color-hh-down)' }}>
-                              {delta > 0 ? '▲' : '▼'} {Math.abs(delta).toFixed(1)}%
-                            </div>
-                          )}
-                        </div>
-                      </div>
+                    <div key={cat.id} className="flex flex-col gap-2">
+                      <div className="text-[14px] font-medium">{cat.name}</div>
                       <div className="flex flex-col gap-[3px]">
-                        <div className="h-1.5 rounded-full bg-[#D8D1C4]" style={{ width: `${(prev / max) * 100}%` }} />
-                        <div className="h-2 rounded-full" style={{ width: `${(cur / max) * 100}%`, background: color }} />
+                        {rows.map((r, i) => (
+                          <div key={r.month} className="h-[26px] rounded-[6px] bg-hh-bg">
+                            <div
+                              className="flex h-full items-center justify-end rounded-[6px] px-2"
+                              style={{ width: `${Math.max((r.amount / max) * 100, 6)}%`, background: color, opacity: monthOpacity(i, rows.length) }}
+                            >
+                              <span
+                                className="whitespace-nowrap text-[12px] font-semibold text-white"
+                                style={{ textShadow: '0 1px 2px rgba(0,0,0,0.45)' }}
+                              >
+                                {formatWon(r.amount)}
+                              </span>
+                            </div>
+                          </div>
+                        ))}
                       </div>
                     </div>
                   )
