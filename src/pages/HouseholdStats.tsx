@@ -45,6 +45,7 @@ function StatsContent() {
   const now = new Date()
   const [year, setYear] = useState(now.getFullYear())
   const [tab, setTab] = useState<Tab>('expense')
+  const [selectedCardId, setSelectedCardId] = useState<number | null>(null)
   const [openingYear, setOpeningYear] = useState<number | null>(null)
   const [yearPickerOpen, setYearPickerOpen] = useState(false)
   const [categories, setCategories] = useState<ExpenseCategory[] | null>(null)
@@ -248,38 +249,63 @@ function StatsContent() {
 
             {cardCategories.length > 0 && (
               <div className="flex flex-col gap-4 rounded-[24px] bg-white p-5">
-                <div className="font-hh-serif text-[18px] font-bold">카드별 월별 지출</div>
+                <div className="flex items-baseline justify-between">
+                  <div className="font-hh-serif text-[18px] font-bold">카드별 월별 지출</div>
+                  {selectedCardId !== null && (
+                    <button type="button" onClick={() => setSelectedCardId(null)} className="text-[12px] font-semibold text-hh-pine">
+                      전체 보기
+                    </button>
+                  )}
+                </div>
                 <div className="flex flex-wrap gap-x-3.5 gap-y-2">
                   {cardCategories.map(({ cat, color }) => (
-                    <div key={cat.id} className="flex items-center gap-1.5 text-[12px] text-[#4A4A44]">
-                      <div className="h-2.5 w-2.5 rounded-[3px]" style={{ background: color }} />
+                    <button
+                      key={cat.id}
+                      type="button"
+                      onClick={() => setSelectedCardId((prev) => (prev === cat.id ? null : cat.id))}
+                      className="flex items-center gap-1.5 text-[12px]"
+                      style={{ color: selectedCardId === null || selectedCardId === cat.id ? '#4A4A44' : '#B3AEA3', fontWeight: selectedCardId === cat.id ? 700 : 400 }}
+                    >
+                      <div className="h-2.5 w-2.5 rounded-[3px]" style={{ background: color, opacity: selectedCardId === null || selectedCardId === cat.id ? 1 : 0.35 }} />
                       {cat.name}
-                    </div>
+                    </button>
                   ))}
                 </div>
-                <div className="flex h-[170px] items-end gap-2 border-b border-hh-divider">
-                  {Array.from({ length: 12 }, (_, i) => i + 1).map((m, i) => {
-                    const total = cardCategories.reduce((s, { cat }) => s + sumFor(cat.id, m), 0)
-                    const scale = 150 / Math.max(maxCardStackTotal(cardCategories, sumFor), 1)
-                    return (
-                      <div key={m} className="flex h-[170px] flex-1 flex-col justify-end gap-0.5" style={{ opacity: i === currentMonthIdx ? 1 : 0.75 }}>
-                        {cardCategories.map(({ cat, color }) => {
-                          const v = sumFor(cat.id, m)
-                          if (v <= 0) return null
-                          return <div key={cat.id} style={{ height: `${Math.max(2, v * scale)}px`, background: color }} className="w-full rounded-[3px]" />
-                        })}
-                        {total === 0 && <div className="w-full" style={{ height: 2 }} />}
-                      </div>
-                    )
-                  })}
-                </div>
-                <div className="-mt-2.5 flex gap-2">
-                  {spends.map((_, i) => (
-                    <div key={i} className={`flex-1 text-center text-[11px] ${i === currentMonthIdx ? 'font-bold text-hh-ink' : 'text-[#8A877E]'}`}>
-                      {i + 1}월
+
+                {selectedCardId === null ? (
+                  <>
+                    <div className="flex h-[170px] items-end gap-2 border-b border-hh-divider">
+                      {Array.from({ length: 12 }, (_, i) => i + 1).map((m, i) => {
+                        const total = cardCategories.reduce((s, { cat }) => s + sumFor(cat.id, m), 0)
+                        const scale = 150 / Math.max(maxCardStackTotal(cardCategories, sumFor), 1)
+                        return (
+                          <div key={m} className="flex h-[170px] flex-1 flex-col justify-end gap-0.5" style={{ opacity: i === currentMonthIdx ? 1 : 0.75 }}>
+                            {cardCategories.map(({ cat, color }) => {
+                              const v = sumFor(cat.id, m)
+                              if (v <= 0) return null
+                              return <div key={cat.id} style={{ height: `${Math.max(2, v * scale)}px`, background: color }} className="w-full rounded-[3px]" />
+                            })}
+                            {total === 0 && <div className="w-full" style={{ height: 2 }} />}
+                          </div>
+                        )
+                      })}
                     </div>
-                  ))}
-                </div>
+                    <div className="-mt-2.5 flex gap-2">
+                      {spends.map((_, i) => (
+                        <div key={i} className={`flex-1 text-center text-[11px] ${i === currentMonthIdx ? 'font-bold text-hh-ink' : 'text-[#8A877E]'}`}>
+                          {i + 1}월
+                        </div>
+                      ))}
+                    </div>
+                  </>
+                ) : (
+                  (() => {
+                    const selected = cardCategories.find(({ cat }) => cat.id === selectedCardId)
+                    if (!selected) return null
+                    const values = Array.from({ length: 12 }, (_, i) => sumFor(selected.cat.id, i + 1))
+                    return <SingleCardLineChart name={selected.cat.name} color={selected.color} values={values} currentMonthIdx={currentMonthIdx} />
+                  })()
+                )}
               </div>
             )}
 
@@ -391,6 +417,64 @@ function MiniStat({ label, value }: { label: string; value: string }) {
     <div className="flex flex-col gap-1 rounded-[16px] bg-hh-bg p-3">
       <div className="text-[11px] text-hh-ink-muted">{label}</div>
       <div className="text-[14px] font-bold">{value}</div>
+    </div>
+  )
+}
+
+function SingleCardLineChart({
+  name,
+  color,
+  values,
+  currentMonthIdx,
+}: {
+  name: string
+  color: string
+  values: number[]
+  currentMonthIdx: number
+}) {
+  const W = 310
+  const top = 150
+  const maxY = Math.max(...values, 1) * 1.15
+  const pts = values.map((v, i) => [i * (W / Math.max(values.length - 1, 1)), top - (v / maxY) * 140] as const)
+  let d = pts.length ? `M${pts[0][0].toFixed(1)} ${pts[0][1].toFixed(1)}` : ''
+  for (let i = 1; i < pts.length; i++) {
+    const [x0, y0] = pts[i - 1]
+    const [x1, y1] = pts[i]
+    const mx = (x0 + x1) / 2
+    d += ` C${mx.toFixed(1)} ${y0.toFixed(1)} ${mx.toFixed(1)} ${y1.toFixed(1)} ${x1.toFixed(1)} ${y1.toFixed(1)}`
+  }
+
+  return (
+    <div className="flex flex-col gap-3.5">
+      <div className="flex items-baseline justify-between">
+        <div className="text-[14px] font-semibold" style={{ color }}>
+          {name} 월별 추이
+        </div>
+        <div className="text-[16px] font-bold" style={{ color }}>
+          {formatWon(values[currentMonthIdx] ?? 0)}
+        </div>
+      </div>
+      <div className="relative">
+        <svg width="100%" height="170" viewBox="0 0 310 170" preserveAspectRatio="none" style={{ display: 'block' }}>
+          <line x1="0" y1="18.75" x2="310" y2="18.75" stroke="#F1ECE3" strokeWidth="1" />
+          <line x1="0" y1="62.5" x2="310" y2="62.5" stroke="#F1ECE3" strokeWidth="1" />
+          <line x1="0" y1="106.25" x2="310" y2="106.25" stroke="#F1ECE3" strokeWidth="1" />
+          <line x1="0" y1="150" x2="310" y2="150" stroke="#ECE6DC" strokeWidth="1" />
+          {d && <path d={d} fill="none" stroke={color} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />}
+          {pts.map(([x, y], i) => (
+            <circle key={i} cx={x} cy={y} r={i === currentMonthIdx ? 4.5 : 2.5} fill={color} />
+          ))}
+        </svg>
+        <div className="absolute left-0 top-[10px] text-[10px] text-[#8A877E]">{man(0.75 * maxY)}</div>
+        <div className="absolute left-0 top-[98px] text-[10px] text-[#8A877E]">{man(0.25 * maxY)}</div>
+      </div>
+      <div className="flex gap-2">
+        {values.map((_, i) => (
+          <div key={i} className={`flex-1 text-center text-[11px] ${i === currentMonthIdx ? 'font-bold text-hh-ink' : 'text-[#8A877E]'}`}>
+            {i + 1}월
+          </div>
+        ))}
+      </div>
     </div>
   )
 }
