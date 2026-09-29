@@ -1,28 +1,25 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { HouseholdGate } from '../components/HouseholdGate'
 import { HouseholdNav } from '../components/HouseholdNav'
+import { HouseholdBottomNav } from '../components/HouseholdBottomNav'
 import { LoadError } from '../components/LoadError'
 import { Loading } from '../components/Loading'
-import { ChevronRightIcon } from '../components/icons'
+import { EditEntryModal } from '../components/EditEntryModal'
 import {
   createEntry,
   deleteEntry,
   formatWon,
-  findMonthSummary,
   getCategories,
   getEntries,
-  getSettings,
   getSummary,
   parseWonInput,
   putEntry,
   type ExpenseCategory,
   type ExpenseEntry,
   type ExpenseGroup,
-  type ExpenseSummary,
+  type ExpenseMonthSummary,
 } from '../lib/household'
-
-// 단일 값이 아니라 품목(날짜별 항목명+금액)을 여러 줄 쌓아서 합계를 보여주는 카테고리.
-const ITEMIZED_CATEGORY_NAMES = new Set(['추가 지출액', '추가 입금액'])
 
 const GROUP_ORDER: ExpenseGroup[] = ['income', 'fixed', 'card', 'utility', 'variable']
 const GROUP_LABEL: Record<ExpenseGroup, string> = {
@@ -32,13 +29,18 @@ const GROUP_LABEL: Record<ExpenseGroup, string> = {
   utility: '통신·공과',
   variable: '기타변동',
 }
-const GROUP_BAR_CLASS: Record<ExpenseGroup, string> = {
-  income: 'bg-hh-gold',
-  fixed: 'bg-hh-pine',
-  card: 'bg-hh-clay',
-  utility: 'bg-primary',
-  variable: 'bg-hh-neutral',
+const GROUP_COLOR: Record<ExpenseGroup, string> = {
+  income: '#8FAE9E',
+  fixed: '#C06A3E',
+  card: '#22433B',
+  utility: '#D9C39C',
+  variable: '#B3AEA3',
 }
+// 카드사 개별 구분용(그룹 색과 겹치지 않도록 별도 팔레트 — dataviz 스킬 validate_palette.js로 검증됨).
+const CARD_ORDER = ['현대카드', '신한카드', '우리카드', '삼성카드']
+const CARD_PALETTE = ['#9B2D4F', '#2E5FA3', '#5C7A29', '#D68A1F']
+const CARD_FALLBACK_COLOR = '#8a8674'
+const ITEMIZED_CATEGORY_NAMES = new Set(['추가 지출액', '추가 입금액'])
 
 export function Household() {
   return (
@@ -54,39 +56,19 @@ function HouseholdContent() {
   const [month, setMonth] = useState(now.getMonth() + 1)
   const [categories, setCategories] = useState<ExpenseCategory[] | null>(null)
   const [entries, setEntries] = useState<ExpenseEntry[] | null>(null)
-  const [summary, setSummary] = useState<ExpenseSummary | null>(null)
-  const [inputs, setInputs] = useState<Record<number, string>>({})
+  const [summary, setSummary] = useState<ExpenseMonthSummary[] | null>(null)
+  const [openingBalance, setOpeningBalance] = useState(0)
   const [categoriesFailed, setCategoriesFailed] = useState(false)
-  const [entriesLoading, setEntriesLoading] = useState(true)
   const [entriesFailed, setEntriesFailed] = useState(false)
-  const [saveError, setSaveError] = useState<{ categoryId: number; message: string } | null>(null)
-  const [openingYear, setOpeningYear] = useState<number | null>(null)
-  const [yearPickerOpen, setYearPickerOpen] = useState(false)
-  // 연도를 빠르게 바꿀 때 이전 연도의 응답이 나중에 도착해 최신 화면을 덮어쓰지 않도록 "마지막 요청만 반영" 가드.
+  const [pickerOpen, setPickerOpen] = useState(false)
+  const [editing, setEditing] = useState<ExpenseCategory | null>(null)
+  const [saving, setSaving] = useState(false)
   const entriesRequestIdRef = useRef(0)
-  const yearRef = useRef(year)
-  const monthStripRef = useRef<HTMLDivElement>(null)
-  const selectedMonthRef = useRef<HTMLButtonElement>(null)
-  useEffect(() => {
-    yearRef.current = year
-  }, [year])
-
-  useEffect(() => {
-    getSettings().then((s) => setOpeningYear(s?.openingYear ?? now.getFullYear()))
-  }, [])
-
-  // 선택된 월 버튼이 항상 스크롤 영역 가운데에 오도록 맞춘다.
-  // categories/entries가 로딩 중일 때는 아직 버튼이 그려지지 않아 ref가 비어있으므로,
-  // 로딩이 끝나 실제 버튼이 그려진 뒤에도 다시 맞춰야 한다.
-  useEffect(() => {
-    selectedMonthRef.current?.scrollIntoView({ inline: 'center', block: 'nearest' })
-  }, [month, year, categories, entries])
 
   const retryCategories = async () => {
     setCategoriesFailed(false)
     try {
-      const data = await getCategories()
-      setCategories(data)
+      setCategories(await getCategories())
     } catch (e) {
       setCategoriesFailed(true)
     }
@@ -95,17 +77,15 @@ function HouseholdContent() {
   const retryEntries = async () => {
     const requestId = ++entriesRequestIdRef.current
     setEntriesFailed(false)
-    setEntriesLoading(true)
     try {
       const [entriesData, summaryData] = await Promise.all([getEntries(year), getSummary(year)])
-      if (entriesRequestIdRef.current !== requestId) return // 더 최신 요청이 이미 나감 -> 이 응답은 버린다
+      if (entriesRequestIdRef.current !== requestId) return
       setEntries(entriesData)
-      setSummary(summaryData)
+      setSummary(summaryData.months)
+      setOpeningBalance(summaryData.openingBalance)
     } catch (e) {
       if (entriesRequestIdRef.current !== requestId) return
       setEntriesFailed(true)
-    } finally {
-      if (entriesRequestIdRef.current === requestId) setEntriesLoading(false)
     }
   }
 
@@ -114,37 +94,26 @@ function HouseholdContent() {
   }, [])
 
   useEffect(() => {
-    setEntriesLoading(true)
-    setEntriesFailed(false)
     retryEntries()
   }, [year])
 
-  useEffect(() => {
-    if (!entries) return
-    const sums: Record<number, number> = {}
-    for (const e of entries) {
-      if (e.month === month) sums[e.categoryId] = (sums[e.categoryId] ?? 0) + e.amount
+  const categoryById = useMemo(() => {
+    const map = new Map<number, ExpenseCategory>()
+    for (const c of categories ?? []) map.set(c.id, c)
+    return map
+  }, [categories])
+
+  // categoryId-month -> 합계 (품목별로 여러 줄인 카테고리도 정확히 더해진다)
+  const sumsByCategoryMonth = useMemo(() => {
+    const map = new Map<string, number>()
+    for (const e of entries ?? []) {
+      const key = `${e.categoryId}-${e.month}`
+      map.set(key, (map.get(key) ?? 0) + e.amount)
     }
-    const byCategory: Record<number, string> = {}
-    for (const cat of categories ?? []) {
-      if (cat.id in sums) {
-        byCategory[cat.id] = formatWon(sums[cat.id])
-        continue
-      }
-      // 고정비는 이번 달 입력이 아직 없으면, 가장 최근 달 값을 화면에 미리 채워만 둔다.
-      // 저장하는 건 아니라서 사용자가 확인(blur)해야 실제로 기록된다.
-      if (cat.groupType === 'fixed') {
-        for (let m = month - 1; m >= 1; m--) {
-          const prior = entries.find((e) => e.categoryId === cat.id && e.month === m)
-          if (prior) {
-            byCategory[cat.id] = formatWon(prior.amount)
-            break
-          }
-        }
-      }
-    }
-    setInputs(byCategory)
-  }, [entries, month, categories])
+    return map
+  }, [entries])
+
+  const sumFor = (categoryId: number, m: number) => sumsByCategoryMonth.get(`${categoryId}-${m}`) ?? 0
 
   const activeByGroup = useMemo(() => {
     const groups: Record<ExpenseGroup, ExpenseCategory[]> = { income: [], fixed: [], card: [], utility: [], variable: [] }
@@ -156,99 +125,132 @@ function HouseholdContent() {
     return groups
   }, [categories])
 
-  const monthSummary = summary ? findMonthSummary(summary, month) : undefined
+  const monthSummary = summary ? findMonthSummaryArr(summary, month) : undefined
+  const prevMonthSummary = summary && month > 1 ? findMonthSummaryArr(summary, month - 1) : undefined
 
-  // Clear error message after 3 seconds
-  useEffect(() => {
-    if (!saveError) return
-    const timer = setTimeout(() => setSaveError(null), 3000)
-    return () => clearTimeout(timer)
-  }, [saveError])
+  const daysInMonth = new Date(year, month, 0).getDate()
+  const income = monthSummary?.income ?? 0
+  const expenseTotal = monthSummary?.expenseTotal ?? 0
+  const netThisMonth = monthSummary?.net ?? 0
+  const savingsRate = income > 0 ? (netThisMonth / income) * 100 : 0
+  const prevSavingsRate =
+    prevMonthSummary && prevMonthSummary.income > 0 ? (prevMonthSummary.net / prevMonthSummary.income) * 100 : null
+  const rateDelta = prevSavingsRate !== null ? savingsRate - prevSavingsRate : null
+  const spendPct = income > 0 ? Math.min(100, (expenseTotal / income) * 100) : 0
+  const momAmt = prevMonthSummary ? prevMonthSummary.expenseTotal - expenseTotal : null
+  const momPct = prevMonthSummary && prevMonthSummary.expenseTotal > 0 ? ((momAmt ?? 0) / prevMonthSummary.expenseTotal) * 100 : null
+  const dailyAvg = expenseTotal / daysInMonth
+  const ytdNet = useMemo(() => {
+    if (!summary) return 0
+    let sum = 0
+    for (const m of summary) if (m.month <= month) sum += m.net
+    return sum
+  }, [summary, month])
 
-  async function saveEntry(categoryId: number, raw: string) {
-    const amount = parseWonInput(raw)
-    const previousValue = inputs[categoryId] ?? ''
-    const entryYear = year
-    const entryMonth = month
-
-    setInputs((prev) => ({ ...prev, [categoryId]: formatWon(amount) }))
-    setSaveError(null)
-
-    try {
-      const { id } = await putEntry({ categoryId, year: entryYear, month: entryMonth, amount })
-      // entries 배열에도 반영해야 한다. 그러지 않으면 [entries, month] 이펙트가 저장 전 stale 값으로
-      // inputs를 다시 만들어, 다른 달로 갔다가 돌아왔을 때 방금 저장한 값이 빈칸으로 보인다.
-      if (yearRef.current === entryYear) {
-        setEntries((prev) => {
-          const list = prev ?? []
-          const idx = list.findIndex(
-            (e) => e.categoryId === categoryId && e.year === entryYear && e.month === entryMonth,
-          )
-          if (idx >= 0) {
-            const next = [...list]
-            next[idx] = { ...next[idx], id, amount, updatedAt: Date.now() }
-            return next
-          }
-          const synthesized: ExpenseEntry = {
-            id,
-            categoryId,
-            year: entryYear,
-            month: entryMonth,
-            amount,
-            memo: null,
-            updatedAt: Date.now(),
-          }
-          return [...list, synthesized]
-        })
-      }
-      const newSummary = await getSummary(entryYear)
-      if (yearRef.current === entryYear) {
-        setSummary(newSummary)
-      }
-    } catch (e) {
-      // Rollback: restore the previous value
-      setInputs((prev) => ({ ...prev, [categoryId]: previousValue }))
-      setSaveError({ categoryId, message: '저장에 실패했습니다.' })
+  const topSpend = useMemo(() => {
+    let best: { name: string; amount: number } | null = null
+    for (const c of categories ?? []) {
+      if (c.groupType === 'income') continue
+      const amt = sumFor(c.id, month)
+      if (amt > 0 && (!best || amt > best.amount)) best = { name: c.name, amount: amt }
     }
+    return best
+  }, [categories, sumsByCategoryMonth, month])
+
+  const donutGroups = useMemo(() => {
+    const totals: Record<ExpenseGroup, number> = { income: 0, fixed: 0, card: 0, utility: 0, variable: 0 }
+    for (const c of categories ?? []) {
+      if (c.groupType === 'income') continue
+      totals[c.groupType] += sumFor(c.id, month)
+    }
+    const groups = (['card', 'fixed', 'utility', 'variable'] as ExpenseGroup[])
+      .map((g) => ({ group: g, name: GROUP_LABEL[g], color: GROUP_COLOR[g], amount: totals[g] }))
+      .filter((g) => g.amount > 0)
+    const total = groups.reduce((s, g) => s + g.amount, 0)
+    let acc = 0
+    const stops: string[] = []
+    for (const g of groups) {
+      const pct = total > 0 ? (g.amount / total) * 100 : 0
+      stops.push(`${g.color} ${acc.toFixed(2)}% ${(acc + pct).toFixed(2)}%`)
+      acc += pct
+    }
+    return { groups, total, donutBg: stops.length ? `conic-gradient(${stops.join(', ')})` : '#ECE6DC' }
+  }, [categories, sumsByCategoryMonth, month])
+
+  const cardStats = useMemo(() => {
+    const cardCats = (categories ?? []).filter((c) => c.groupType === 'card' && !c.archivedAt)
+    const ordered = [...CARD_ORDER.filter((n) => cardCats.some((c) => c.name === n)), ...cardCats.map((c) => c.name).filter((n) => !CARD_ORDER.includes(n))]
+    const rows = ordered
+      .map((name) => cardCats.find((c) => c.name === name))
+      .filter((c): c is ExpenseCategory => !!c)
+      .map((c, i) => {
+        const amt = sumFor(c.id, month)
+        const prev = sumFor(c.id, month - 1)
+        const delta = prev > 0 ? ((amt - prev) / prev) * 100 : null
+        return { id: c.id, name: c.name, amount: amt, delta, color: CARD_PALETTE[i] ?? CARD_FALLBACK_COLOR }
+      })
+    const max = Math.max(1, ...rows.map((r) => r.amount))
+    return rows.map((r) => ({ ...r, bar: (r.amount / max) * 100 }))
+  }, [categories, sumsByCategoryMonth, month])
+
+  const sections = useMemo(() => {
+    return GROUP_ORDER.map((group) => {
+      const cats = activeByGroup[group]
+      const total = cats.reduce((s, c) => s + sumFor(c.id, month), 0)
+      return { group, title: GROUP_LABEL[group], color: GROUP_COLOR[group], total, categories: cats }
+    })
+  }, [activeByGroup, sumsByCategoryMonth, month])
+
+  async function saveSingleEntry(categoryId: number, amount: number) {
+    setSaving(true)
+    try {
+      await putEntry({ categoryId, year, month, amount })
+      await retryEntries()
+      setEditing(null)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  function goMonth(delta: number) {
+    let m = month + delta
+    let y = year
+    if (m > 12) {
+      m = 1
+      y += 1
+    } else if (m < 1) {
+      m = 12
+      y -= 1
+    }
+    setYear(y)
+    setMonth(m)
   }
 
   if (categoriesFailed) {
     return (
-      <div className="flex min-h-svh flex-col bg-bg">
+      <div className="flex min-h-svh flex-col bg-hh-bg">
         <HouseholdNav />
         <div className="flex-1">
-          <LoadError
-            screen={false}
-            message="항목 정보를 불러오지 못했어요."
-            onRetry={retryCategories}
-          />
+          <LoadError screen={false} message="항목 정보를 불러오지 못했어요." onRetry={retryCategories} />
         </div>
       </div>
     )
   }
 
-  if (!categories || entriesFailed) {
+  if (entriesFailed) {
     return (
-      <div className="flex min-h-svh flex-col bg-bg">
+      <div className="flex min-h-svh flex-col bg-hh-bg">
         <HouseholdNav />
-        {!categories ? (
-          <Loading />
-        ) : (
-          <div className="flex-1">
-            <LoadError
-              screen={false}
-              message="데이터를 불러오지 못했어요."
-              onRetry={retryEntries}
-            />
-          </div>
-        )}
+        <div className="flex-1">
+          <LoadError screen={false} message="데이터를 불러오지 못했어요." onRetry={retryEntries} />
+        </div>
       </div>
     )
   }
 
-  if (!categories || !entries) {
+  if (!categories || !entries || !summary) {
     return (
-      <div className="flex min-h-svh flex-col bg-bg">
+      <div className="flex min-h-svh flex-col bg-hh-bg">
         <HouseholdNav />
         <Loading />
       </div>
@@ -256,82 +258,172 @@ function HouseholdContent() {
   }
 
   return (
-    <div className="flex min-h-svh flex-col bg-bg">
+    <div className="flex min-h-svh flex-col bg-hh-bg font-hh-sans text-hh-ink" style={{ fontVariantNumeric: 'tabular-nums' }}>
       <HouseholdNav />
-      <div className="flex-1 px-[22px] pb-8">
-        <div className="flex items-center gap-2 pt-5">
-          <div className="relative flex-none">
-            <button
-              type="button"
-              onClick={() => setYearPickerOpen((v) => !v)}
-              className="flex items-center gap-1 rounded-xl border border-border bg-surface px-3 py-1.5 text-[14px] font-semibold"
-            >
-              {year}년
-              <ChevronRightIcon width={13} height={13} className="rotate-90 text-ink-muted" strokeWidth={2} />
-            </button>
-            {yearPickerOpen && (
-              <>
-                <div className="fixed inset-0 z-10" onClick={() => setYearPickerOpen(false)} />
-                <div className="absolute left-0 top-full z-20 mt-1.5 max-h-[240px] w-[110px] overflow-y-auto rounded-[14px] border border-border bg-surface py-1.5 shadow-[0_8px_24px_-8px_rgba(0,0,0,0.18)]">
-                  {Array.from({ length: now.getFullYear() - (openingYear ?? now.getFullYear()) + 1 }, (_, i) => (openingYear ?? now.getFullYear()) + i)
-                    .reverse()
-                    .map((y) => (
-                      <button
-                        key={y}
-                        type="button"
-                        onClick={() => {
-                          setYear(y)
-                          setYearPickerOpen(false)
-                        }}
-                        className={`block w-full px-3.5 py-2 text-left text-[14px] font-semibold ${
-                          y === year ? 'text-hh-pine' : 'text-ink'
-                        }`}
-                      >
-                        {y}년
-                      </button>
-                    ))}
-                </div>
-              </>
+
+      {/* 월 전환 */}
+      <div className="flex items-center justify-between px-3 pb-3 pt-1">
+        <button type="button" aria-label="이전 달" onClick={() => goMonth(-1)} className="flex h-11 w-11 items-center justify-center rounded-full">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#1E2B27" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="m15 6-6 6 6 6" />
+          </svg>
+        </button>
+        <button type="button" onClick={() => setPickerOpen(true)} className="relative flex flex-col items-center gap-0.5">
+          <span className="text-[12px] text-hh-ink-muted">{year}</span>
+          <span className="font-hh-serif text-[24px] font-bold">{month}월</span>
+          {pickerOpen && (
+            <MonthYearPicker year={year} month={month} onPick={(y, m) => { setYear(y); setMonth(m); setPickerOpen(false) }} onClose={() => setPickerOpen(false)} />
+          )}
+        </button>
+        <button type="button" aria-label="다음 달" onClick={() => goMonth(1)} className="flex h-11 w-11 items-center justify-center rounded-full">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#1E2B27" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="m9 6 6 6-6 6" />
+          </svg>
+        </button>
+      </div>
+
+      <div className="flex flex-col gap-4 px-5 pb-6">
+        {/* 히어로 */}
+        <div className="flex flex-col gap-[18px] rounded-[28px] bg-hh-pine p-6 text-white shadow-[0_18px_40px_-24px_rgba(34,67,59,0.7)]">
+          <div className="flex items-center justify-between">
+            <div className="text-[14px] text-[#CFDDD5]">이번 달 남은 돈</div>
+            {income > 0 && (
+              <div className="rounded-full bg-[#E3ECE6] px-2.5 py-1 text-[12px] font-semibold text-hh-pine">
+                저축률 {savingsRate.toFixed(1)}%
+              </div>
             )}
           </div>
-          <div ref={monthStripRef} className="no-scrollbar flex flex-1 gap-1.5 overflow-x-auto scroll-px-6 px-1">
-            {Array.from({ length: 12 }, (_, i) => i + 1).map((m) => (
-              <button
-                key={m}
-                ref={m === month ? selectedMonthRef : undefined}
-                onClick={() => setMonth(m)}
-                className={`flex-none rounded-full px-3 py-1.5 text-[13px] font-semibold ${
-                  m === month ? 'bg-hh-pine text-white' : 'bg-surface text-ink-muted'
-                }`}
+          <div className="flex items-baseline gap-1.5">
+            <div className="text-[40px] font-bold tracking-tight">{formatWon(monthSummary?.balance ?? openingBalance)}</div>
+            <div className="text-[18px] text-[#CFDDD5]">원</div>
+          </div>
+          {income > 0 && (
+            <div className="flex flex-col gap-2">
+              <div className="flex h-2.5 gap-[3px] overflow-hidden rounded-full">
+                <div className="rounded-full bg-[#C06A3E]" style={{ width: `${spendPct}%` }} />
+                <div className="flex-1 rounded-full bg-[#8FAE9E]" />
+              </div>
+              <div className="flex justify-between text-[12px] text-[#CFDDD5]">
+                <div>수입의 {spendPct.toFixed(1)}% 사용</div>
+                {rateDelta !== null && (
+                  <div>지난달보다 저축률 {rateDelta >= 0 ? '+' : '−'}{Math.abs(rateDelta).toFixed(1)}%p</div>
+                )}
+              </div>
+            </div>
+          )}
+          <div className="grid grid-cols-2 gap-3">
+            <div className="flex flex-col gap-1 rounded-[18px] bg-white/10 p-3.5">
+              <div className="text-[12px] text-[#CFDDD5]">수입</div>
+              <div className="text-[17px] font-semibold">{formatWon(income)}</div>
+            </div>
+            <div className="flex flex-col gap-1 rounded-[18px] bg-white/10 p-3.5">
+              <div className="text-[12px] text-[#CFDDD5]">지출</div>
+              <div className="text-[17px] font-semibold">{formatWon(expenseTotal)}</div>
+            </div>
+          </div>
+        </div>
+
+        {/* KPI */}
+        <div className="grid grid-cols-2 gap-3">
+          <KpiCard
+            label="전월 대비 지출"
+            value={momAmt !== null ? `${momAmt >= 0 ? '−' : '+'}${formatWon(Math.abs(momAmt))}` : '—'}
+            chip={momPct !== null ? `${momPct >= 0 ? '▼' : '▲'} ${Math.abs(momPct).toFixed(1)}%` : undefined}
+          />
+          <KpiCard label="하루 평균 지출" value={formatWon(dailyAvg)} sub={`${daysInMonth}일 기준`} />
+          <KpiCard label="가장 큰 지출" value={topSpend ? formatWon(topSpend.amount) : '—'} sub={topSpend?.name ?? '등록된 지출 없음'} />
+          <KpiCard label="올해 누적 순증감" value={`${ytdNet >= 0 ? '+' : '−'}${formatWon(Math.abs(ytdNet))}`} sub={`1–${month}월 합계`} />
+        </div>
+
+        {/* 지출 구성 */}
+        {donutGroups.total > 0 && (
+          <div className="flex flex-col gap-4 rounded-[24px] bg-white p-5">
+            <div className="flex items-baseline justify-between">
+              <div className="font-hh-serif text-[18px] font-bold">지출 구성</div>
+              <Link to="/household/stats" className="text-[13px] font-semibold no-underline text-hh-pine">
+                통계 보기
+              </Link>
+            </div>
+            <div className="flex items-center gap-5">
+              <div
+                className="flex h-[124px] w-[124px] flex-none items-center justify-center rounded-full"
+                style={{ background: donutGroups.donutBg }}
               >
-                {m}월
+                <div className="flex h-[84px] w-[84px] flex-col items-center justify-center rounded-full bg-white">
+                  <div className="text-[11px] text-hh-ink-muted">총 지출</div>
+                  <div className="text-[14px] font-bold">{(expenseTotal / 10000).toFixed(0)}만</div>
+                </div>
+              </div>
+              <div className="flex flex-1 flex-col gap-3">
+                {donutGroups.groups.map((g) => (
+                  <div key={g.group} className="flex items-center gap-2">
+                    <div className="h-2.5 w-2.5 flex-none rounded-[4px]" style={{ background: g.color }} />
+                    <div className="flex-1 text-[13px]">{g.name}</div>
+                    <div className="flex flex-col items-end">
+                      <div className="text-[13px] font-semibold">{formatWon(g.amount)}</div>
+                      <div className="text-[11px] text-hh-ink-muted">{((g.amount / donutGroups.total) * 100).toFixed(1)}%</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* 카드별 사용액 */}
+        {cardStats.length > 0 && (
+          <div className="flex flex-col gap-4 rounded-[24px] bg-white p-5">
+            <div className="flex items-baseline justify-between">
+              <div className="font-hh-serif text-[18px] font-bold">카드별 사용액</div>
+              <div className="text-[12px] text-hh-ink-muted">지난달 대비</div>
+            </div>
+            {cardStats.map((c) => (
+              <button
+                key={c.id}
+                type="button"
+                onClick={() => setEditing(categoryById.get(c.id) ?? null)}
+                className="flex flex-col gap-2 border-none bg-transparent p-0 text-left"
+              >
+                <div className="flex items-center gap-2.5">
+                  <div className="h-[22px] w-8 flex-none rounded-[5px]" style={{ background: c.color }} />
+                  <div className="flex-1 text-[14px] font-medium text-hh-ink">{c.name}</div>
+                  <div className="text-[14px] font-semibold text-hh-ink">{formatWon(c.amount)}</div>
+                  {c.delta !== null && (
+                    <div
+                      className="min-w-[52px] rounded-full px-1.5 py-0.5 text-center text-[11px] font-semibold"
+                      style={{
+                        color: c.delta > 0 ? 'var(--color-hh-up)' : 'var(--color-hh-down)',
+                        background: c.delta > 0 ? 'var(--color-hh-up-tint)' : 'var(--color-hh-down-tint)',
+                      }}
+                    >
+                      {c.delta > 0 ? '▲' : '▼'} {Math.abs(c.delta).toFixed(1)}%
+                    </div>
+                  )}
+                </div>
+                <div className="h-1.5 overflow-hidden rounded-full bg-hh-divider">
+                  <div className="h-1.5 rounded-full" style={{ width: `${c.bar}%`, background: c.color }} />
+                </div>
               </button>
             ))}
           </div>
-        </div>
+        )}
 
-        <div className="mt-5 rounded-[18px] border-t-4 border-hh-gold bg-surface p-6 shadow-[0_1px_2px_rgba(0,0,0,0.04)]">
-          <div className="flex items-center gap-2 text-[13px] font-medium text-ink-muted">
-            {year}년 {month}월
-            <span className="h-1.5 w-1.5 rounded-full bg-hh-gold" />
-          </div>
-          <div className="mt-2 text-[38px] font-extrabold tracking-tight text-hh-pine">
-            {formatWon(monthSummary?.balance ?? 0)}
-            <span className="ml-1 text-[20px] font-semibold text-ink-muted">원</span>
-          </div>
-          <div className="mt-1 text-[14px] font-medium text-ink-muted">이번 달 남은 돈</div>
-        </div>
-
-        {GROUP_ORDER.map((group) => (
-          <div
-            key={group}
-            className={`mt-5 ${group === 'income' ? 'rounded-[18px] bg-hh-gold-tint px-3.5 pb-1 pt-3.5' : ''}`}
-          >
-            <div className="mb-1 text-[13px] font-semibold text-ink-muted">{GROUP_LABEL[group]}</div>
-            {activeByGroup[group].length === 0 && (
-              <p className="m-0 py-2 text-[13px] text-ink-muted">등록된 항목이 없어요.</p>
-            )}
-            {activeByGroup[group].map((cat) =>
+        {/* 입력 내역 */}
+        <div className="pt-1 font-hh-serif text-[18px] font-bold">{month}월 입력 내역</div>
+        {sections.map((s) => (
+          <div key={s.group} className="flex flex-col rounded-[24px] bg-white px-2 pb-1.5 pt-1">
+            <div className="flex items-center justify-between px-3 py-2.5">
+              <div className="flex items-center gap-2">
+                <div className="h-2 w-2 rounded-full" style={{ background: s.color }} />
+                <div className="text-[13px] font-semibold text-[#4A4A44]">{s.title}</div>
+              </div>
+              <div className="text-[13px] font-semibold" style={{ color: s.group === 'income' ? 'var(--color-hh-down)' : '#1E2B27' }}>
+                {s.group === 'income' ? '+' : '−'}
+                {formatWon(s.total)}
+              </div>
+            </div>
+            {s.categories.length === 0 && <p className="m-0 px-3 pb-2 text-[13px] text-hh-ink-muted">등록된 항목이 없어요.</p>}
+            {s.categories.map((cat) =>
               ITEMIZED_CATEGORY_NAMES.has(cat.name) ? (
                 <ItemizedRow
                   key={cat.id}
@@ -339,36 +431,96 @@ function HouseholdContent() {
                   year={year}
                   month={month}
                   items={(entries ?? []).filter((e) => e.categoryId === cat.id && e.month === month)}
-                  barClass={GROUP_BAR_CLASS[group]}
                   onChanged={retryEntries}
                 />
               ) : (
-                <div key={cat.id} className="flex items-center gap-3 border-b border-hh-divider py-3.5">
-                  <div className={`h-8 w-[3px] flex-none rounded-full ${GROUP_BAR_CLASS[group]}`} />
-                  <div className="flex-1 text-[15px] font-medium">{cat.name}</div>
-                  <div className="relative w-[124px] mb-4">
-                    <input
-                      inputMode="numeric"
-                      disabled={entriesLoading}
-                      value={inputs[cat.id] ?? ''}
-                      onChange={(e) => setInputs((prev) => ({ ...prev, [cat.id]: e.target.value }))}
-                      onFocus={(e) => e.target.select()}
-                      onBlur={(e) => saveEntry(cat.id, e.target.value)}
-                      placeholder="0"
-                      className="w-full rounded-[10px] border border-border bg-surface-alt px-2.5 py-2 text-right text-[16px] font-semibold tabular-nums outline-none focus:border-hh-pine focus:bg-surface disabled:opacity-50 disabled:cursor-not-allowed"
-                    />
-                    {saveError?.categoryId === cat.id && (
-                      <div className="absolute top-full right-0 mt-1 text-[12px] text-red-500 whitespace-nowrap">
-                        {saveError.message}
-                      </div>
-                    )}
+                <button
+                  key={cat.id}
+                  type="button"
+                  onClick={() => setEditing(cat)}
+                  className="flex min-h-[52px] items-center justify-between rounded-[14px] border-none bg-transparent px-3 text-left text-hh-ink"
+                >
+                  <div className="text-[15px]">{cat.name}</div>
+                  <div className="flex items-center gap-2">
+                    <div className="text-[15px] font-semibold">{formatWon(sumFor(cat.id, month))}</div>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#B3AEA3" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="m9 6 6 6-6 6" />
+                    </svg>
                   </div>
-                </div>
+                </button>
               ),
             )}
           </div>
         ))}
       </div>
+
+      <HouseholdBottomNav />
+
+      <EditEntryModal
+        open={!!editing}
+        categoryName={editing?.name ?? ''}
+        initialAmount={editing ? sumFor(editing.id, month) : 0}
+        saving={saving}
+        onConfirm={(amount) => editing && saveSingleEntry(editing.id, amount)}
+        onCancel={() => setEditing(null)}
+      />
+    </div>
+  )
+}
+
+function findMonthSummaryArr(months: ExpenseMonthSummary[], month: number) {
+  return months.find((m) => m.month === month)
+}
+
+function KpiCard({ label, value, sub, chip }: { label: string; value: string; sub?: string; chip?: string }) {
+  return (
+    <div className="flex flex-col gap-2 rounded-[22px] bg-white p-4">
+      <div className="text-[12px] text-hh-ink-muted">{label}</div>
+      <div className="text-[18px] font-bold">{value}</div>
+      {chip && (
+        <div className="self-start rounded-full bg-hh-down-tint px-2 py-0.5 text-[12px] font-semibold text-hh-down">{chip}</div>
+      )}
+      {sub && <div className="text-[12px] text-hh-ink-muted">{sub}</div>}
+    </div>
+  )
+}
+
+function MonthYearPicker({
+  year,
+  month,
+  onPick,
+  onClose,
+}: {
+  year: number
+  month: number
+  onPick: (year: number, month: number) => void
+  onClose: () => void
+}) {
+  const [y, setY] = useState(year)
+  return (
+    <div role="presentation" onClick={(e) => e.stopPropagation()} className="absolute left-1/2 top-full z-30 mt-2 w-[280px] -translate-x-1/2 rounded-[20px] bg-white p-4 text-left shadow-[0_12px_32px_-8px_rgba(0,0,0,0.25)]">
+      <div className="mb-3 flex items-center justify-between">
+        <button type="button" onClick={() => setY((v) => v - 1)} className="flex h-8 w-8 items-center justify-center rounded-full" aria-label="이전 연도">‹</button>
+        <div className="text-[15px] font-bold">{y}년</div>
+        <button type="button" onClick={() => setY((v) => v + 1)} className="flex h-8 w-8 items-center justify-center rounded-full" aria-label="다음 연도">›</button>
+      </div>
+      <div className="grid grid-cols-4 gap-2">
+        {Array.from({ length: 12 }, (_, i) => i + 1).map((m) => (
+          <button
+            key={m}
+            type="button"
+            onClick={() => onPick(y, m)}
+            className={`rounded-[10px] py-2 text-[13px] font-semibold ${
+              y === year && m === month ? 'bg-hh-pine text-white' : 'bg-hh-bg text-hh-ink'
+            }`}
+          >
+            {m}월
+          </button>
+        ))}
+      </div>
+      <button type="button" onClick={onClose} className="mt-3 w-full rounded-[10px] border border-hh-border bg-white py-2 text-[13px] font-semibold text-hh-ink-muted">
+        닫기
+      </button>
     </div>
   )
 }
@@ -379,14 +531,12 @@ function ItemizedRow({
   year,
   month,
   items,
-  barClass,
   onChanged,
 }: {
   category: ExpenseCategory
   year: number
   month: number
   items: ExpenseEntry[]
-  barClass: string
   onChanged: () => void
 }) {
   const [open, setOpen] = useState(false)
@@ -415,45 +565,52 @@ function ItemizedRow({
   }
 
   return (
-    <div className="border-b border-hh-divider py-3.5">
-      <button type="button" onClick={() => setOpen((v) => !v)} className="flex w-full items-center gap-3">
-        <div className={`h-8 w-[3px] flex-none rounded-full ${barClass}`} />
-        <div className="flex-1 text-left text-[15px] font-medium">{category.name}</div>
-        <div className="rounded-[10px] border border-border bg-surface-alt px-2.5 py-2 text-right text-[16px] font-semibold tabular-nums">
-          {formatWon(total)}
+    <div className="flex flex-col rounded-[14px]">
+      <button type="button" onClick={() => setOpen((v) => !v)} className="flex min-h-[52px] w-full items-center justify-between border-none bg-transparent px-3 text-left text-hh-ink">
+        <div className="text-[15px]">{category.name}</div>
+        <div className="flex items-center gap-2">
+          <div className="text-[15px] font-semibold">{formatWon(total)}</div>
+          <svg
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="#B3AEA3"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            style={{ transform: open ? 'rotate(90deg)' : undefined }}
+          >
+            <path d="m9 6 6 6-6 6" />
+          </svg>
         </div>
-        <ChevronRightIcon
-          width={14}
-          height={14}
-          className={`flex-none text-ink-muted transition-transform ${open ? 'rotate-90' : ''}`}
-        />
       </button>
 
       {open && (
-        <div className="mt-3 pl-[19px]">
-          {items.length === 0 && <p className="m-0 pb-2 text-[13px] text-ink-muted">등록된 품목이 없어요.</p>}
+        <div className="flex flex-col gap-1.5 px-3 pb-3">
+          {items.length === 0 && <p className="m-0 pb-1 text-[13px] text-hh-ink-muted">등록된 품목이 없어요.</p>}
           {items.map((it) => (
-            <div key={it.id} className="flex items-center gap-2 py-1.5 text-[14px]">
-              <div className="flex-1 text-ink-muted">{it.memo || '(이름 없음)'}</div>
+            <div key={it.id} className="flex items-center gap-2 py-1 text-[14px]">
+              <div className="flex-1 text-hh-ink-muted">{it.memo || '(이름 없음)'}</div>
               <div className="font-medium tabular-nums">{formatWon(it.amount)}원</div>
-              <button type="button" onClick={() => removeItem(it.id)} className="px-1 text-ink-muted" aria-label="품목 삭제">
+              <button type="button" onClick={() => removeItem(it.id)} className="px-1 text-hh-ink-muted" aria-label="품목 삭제">
                 ✕
               </button>
             </div>
           ))}
-          <div className="mt-2 flex gap-1.5">
+          <div className="mt-1 flex gap-1.5">
             <input
               value={label}
               onChange={(e) => setLabel(e.target.value)}
               placeholder="항목명"
-              className="min-w-0 flex-1 rounded-[10px] border border-border bg-surface px-2.5 py-2 text-[14px] outline-none focus:border-hh-pine"
+              className="min-w-0 flex-1 rounded-[10px] border border-hh-border bg-hh-bg px-2.5 py-2 text-[14px] outline-none focus:border-hh-pine"
             />
             <input
               inputMode="numeric"
               value={amount}
               onChange={(e) => setAmount(e.target.value)}
               placeholder="금액"
-              className="w-[90px] flex-none rounded-[10px] border border-border bg-surface px-2.5 py-2 text-right text-[14px] tabular-nums outline-none focus:border-hh-pine"
+              className="w-[90px] flex-none rounded-[10px] border border-hh-border bg-hh-bg px-2.5 py-2 text-right text-[14px] tabular-nums outline-none focus:border-hh-pine"
             />
             <button
               type="button"

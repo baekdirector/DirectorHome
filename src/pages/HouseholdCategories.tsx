@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { HouseholdGate } from '../components/HouseholdGate'
 import { HouseholdNav } from '../components/HouseholdNav'
+import { HouseholdBottomNav } from '../components/HouseholdBottomNav'
 import { LoadError } from '../components/LoadError'
 import { Loading } from '../components/Loading'
 import { createCategory, getCategories, updateCategory, type ExpenseCategory, type ExpenseGroup } from '../lib/household'
@@ -70,7 +71,7 @@ function CategoriesContent() {
 
   if (loadFailed) {
     return (
-      <div className="flex min-h-svh flex-col bg-bg">
+      <div className="flex min-h-svh flex-col bg-hh-bg">
         <HouseholdNav />
         <div className="flex-1">
           <LoadError screen={false} message="항목 정보를 불러오지 못했어요." onRetry={reload} />
@@ -81,7 +82,7 @@ function CategoriesContent() {
 
   if (!categories) {
     return (
-      <div className="flex min-h-svh flex-col bg-bg">
+      <div className="flex min-h-svh flex-col bg-hh-bg">
         <HouseholdNav />
         <Loading />
       </div>
@@ -89,22 +90,22 @@ function CategoriesContent() {
   }
 
   return (
-    <div className="flex min-h-svh flex-col bg-bg">
+    <div className="flex min-h-svh flex-col bg-hh-bg font-hh-sans text-hh-ink">
       <HouseholdNav />
-      <div className="flex-1 px-[22px] pb-8">
-        <h1 className="pt-5 text-[20px] font-extrabold">카테고리 관리</h1>
+      <div className="flex-1 px-5 pb-6">
+        <h1 className="pt-3 font-hh-serif text-[20px] font-bold">카테고리 관리</h1>
 
         <div className="mt-4 flex gap-2">
           <input
             value={name}
             onChange={(e) => setName(e.target.value)}
             placeholder="새 항목 이름"
-            className="flex-1 rounded-xl border border-border bg-surface px-3 py-2 text-[14px]"
+            className="flex-1 rounded-xl border border-hh-border bg-white px-3 py-2 text-[14px] outline-none focus:border-hh-pine"
           />
           <select
             value={groupType}
             onChange={(e) => setGroupType(e.target.value as ExpenseGroup)}
-            className="rounded-xl border border-border bg-surface px-2 py-2 text-[14px]"
+            className="rounded-xl border border-hh-border bg-white px-2 py-2 text-[14px]"
           >
             {GROUP_OPTIONS.map((g) => (
               <option key={g.value} value={g.value}>
@@ -119,24 +120,24 @@ function CategoriesContent() {
 
         {GROUP_OPTIONS.map(({ value, label }) => (
           <div key={value} className="mt-5">
-            <div className="mb-1 text-[13px] font-semibold text-ink-muted">{label}</div>
+            <div className="mb-1 text-[13px] font-semibold text-hh-ink-muted">{label}</div>
             {categories
               .filter((c) => c.groupType === value)
               .sort((a, b) => a.displayOrder - b.displayOrder)
               .map((cat) => (
                 <div key={cat.id} className="flex items-center gap-2 border-b border-hh-divider py-3">
-                  <span className={`flex-1 text-[15px] ${cat.archivedAt ? 'text-ink-muted line-through' : ''}`}>
+                  <span className={`flex-1 text-[15px] ${cat.archivedAt ? 'text-hh-ink-muted line-through' : ''}`}>
                     {cat.name}
                   </span>
-                  <button onClick={() => move(cat, -1)} className="px-1 text-ink-muted" aria-label="위로">
+                  <button onClick={() => move(cat, -1)} className="px-1 text-hh-ink-muted" aria-label="위로">
                     ▲
                   </button>
-                  <button onClick={() => move(cat, 1)} className="px-1 text-ink-muted" aria-label="아래로">
+                  <button onClick={() => move(cat, 1)} className="px-1 text-hh-ink-muted" aria-label="아래로">
                     ▼
                   </button>
                   <button
                     onClick={() => toggleArchive(cat)}
-                    className="rounded-lg border border-border px-2.5 py-1 text-[12.5px] font-semibold"
+                    className="rounded-lg border border-hh-border px-2.5 py-1 text-[12.5px] font-semibold"
                   >
                     {cat.archivedAt ? '복원' : '숨기기'}
                   </button>
@@ -145,6 +146,7 @@ function CategoriesContent() {
           </div>
         ))}
       </div>
+      <HouseholdBottomNav />
     </div>
   )
 }

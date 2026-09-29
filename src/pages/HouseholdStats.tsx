@@ -1,37 +1,31 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Bar, BarChart, CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { HouseholdGate } from '../components/HouseholdGate'
 import { HouseholdNav } from '../components/HouseholdNav'
+import { HouseholdBottomNav } from '../components/HouseholdBottomNav'
 import { LoadError } from '../components/LoadError'
 import { Loading } from '../components/Loading'
 import {
   formatWon,
   getCategories,
   getEntries,
+  getSettings,
   getSummary,
   type ExpenseCategory,
   type ExpenseEntry,
-  type ExpenseSummary,
+  type ExpenseMonthSummary,
 } from '../lib/household'
 
-const GROUP_COLOR = { income: '#B98A3D', fixed: '#123A34', card: '#A2432E', utility: '#1f6f6b', variable: '#8a8674' }
-
-// 그룹 내부(카드사별, 수입 항목별)를 구분할 때 쓰는 보조 팔레트.
-// dataviz 스킬 validate_palette.js로 검증 완료 (light, surface #faf7f0 기준 전부 PASS).
-const SUB_PALETTE = ['#9B2D4F', '#2E5FA3', '#5C7A29', '#D68A1F']
-const FALLBACK_SUB_COLOR = '#8a8674'
-
 const CARD_ORDER = ['현대카드', '신한카드', '우리카드', '삼성카드']
+const CARD_PALETTE = ['#9B2D4F', '#2E5FA3', '#5C7A29', '#D68A1F']
+const CARD_FALLBACK_COLOR = '#8a8674'
 const INCOME_BUCKETS = ['월급', '이자', '추가 입금액']
-
-/** 차트 Y축용 축약 표기: 1억 이상은 "1.6억", 1만 이상은 "500만", 그 미만은 그대로. */
-function formatCompactWon(v: number): string {
-  if (Math.abs(v) >= 100_000_000) return `${(v / 100_000_000).toFixed(1)}억`
-  if (Math.abs(v) >= 10_000) return `${Math.round(v / 10_000)}만`
-  return `${v}`
-}
+const INCOME_PALETTE = ['#9B2D4F', '#2E5FA3', '#5C7A29']
 
 type Tab = 'expense' | 'income' | 'balance'
+
+function man(n: number) {
+  return `${Math.round(n / 10000).toLocaleString('ko-KR')}만`
+}
 
 export function HouseholdStats() {
   return (
@@ -45,12 +39,17 @@ function StatsContent() {
   const now = new Date()
   const [year, setYear] = useState(now.getFullYear())
   const [tab, setTab] = useState<Tab>('expense')
+  const [openingYear, setOpeningYear] = useState<number | null>(null)
+  const [yearPickerOpen, setYearPickerOpen] = useState(false)
   const [categories, setCategories] = useState<ExpenseCategory[] | null>(null)
   const [entries, setEntries] = useState<ExpenseEntry[] | null>(null)
-  const [summary, setSummary] = useState<ExpenseSummary | null>(null)
+  const [months, setMonths] = useState<ExpenseMonthSummary[] | null>(null)
   const [loadFailed, setLoadFailed] = useState(false)
-  // 연도를 빠르게 바꿀 때 이전 연도의 응답이 나중에 도착해 최신 화면을 덮어쓰지 않도록 "마지막 요청만 반영" 가드.
   const requestIdRef = useRef(0)
+
+  useEffect(() => {
+    getSettings().then((s) => setOpeningYear(s?.openingYear ?? now.getFullYear()))
+  }, [])
 
   const load = () => {
     const requestId = ++requestIdRef.current
@@ -60,7 +59,7 @@ function StatsContent() {
         if (requestIdRef.current !== requestId) return
         setCategories(cats)
         setEntries(ents)
-        setSummary(sum)
+        setMonths(sum.months)
       })
       .catch(() => {
         if (requestIdRef.current !== requestId) return
@@ -70,8 +69,7 @@ function StatsContent() {
 
   useEffect(load, [year])
 
-  // categoryId+month -> 합계 (같은 카테고리에 중복 entry는 없지만, 안전하게 합산)
-  const byCategoryMonth = useMemo(() => {
+  const sumsByCategoryMonth = useMemo(() => {
     const map = new Map<string, number>()
     for (const e of entries ?? []) {
       const key = `${e.categoryId}-${e.month}`
@@ -79,95 +77,24 @@ function StatsContent() {
     }
     return map
   }, [entries])
+  const sumFor = (categoryId: number, m: number) => sumsByCategoryMonth.get(`${categoryId}-${m}`) ?? 0
 
-  const trendData = useMemo(
-    () =>
-      (summary?.months ?? []).map((m) => ({
-        month: `${m.month}월`,
-        고정비: m.fixedTotal,
-        카드: m.cardTotal,
-        '통신·공과': m.utilityTotal,
-        기타변동: m.variableTotal,
-      })),
-    [summary],
-  )
+  const monthsElapsed = year === now.getFullYear() ? now.getMonth() + 1 : 12
+  const currentMonthIdx = monthsElapsed - 1
 
-  const cardTrendData = useMemo(() => {
-    const cardCategories = (categories ?? []).filter((c) => c.groupType === 'card' && !c.archivedAt)
-    return Array.from({ length: 12 }, (_, i) => {
-      const month = i + 1
-      const row: Record<string, string | number> = { month: `${month}월` }
-      for (const c of cardCategories) row[c.name] = byCategoryMonth.get(`${c.id}-${month}`) ?? 0
-      return row
-    })
-  }, [categories, byCategoryMonth])
+  const spends = useMemo(() => (months ?? []).map((m) => m.expenseTotal), [months])
+  const incomes = useMemo(() => (months ?? []).map((m) => m.income), [months])
+  const balances = useMemo(() => (months ?? []).map((m) => m.balance), [months])
 
-  const cardNames = useMemo(() => {
-    const names = (categories ?? []).filter((c) => c.groupType === 'card' && !c.archivedAt).map((c) => c.name)
-    return [...CARD_ORDER.filter((n) => names.includes(n)), ...names.filter((n) => !CARD_ORDER.includes(n))]
+  const cardCategories = useMemo(() => {
+    const cats = (categories ?? []).filter((c) => c.groupType === 'card' && !c.archivedAt)
+    const ordered = [...CARD_ORDER.filter((n) => cats.some((c) => c.name === n)), ...cats.map((c) => c.name).filter((n) => !CARD_ORDER.includes(n))]
+    return ordered.map((n, i) => ({ cat: cats.find((c) => c.name === n)!, color: CARD_PALETTE[i] ?? CARD_FALLBACK_COLOR })).filter((x) => x.cat)
   }, [categories])
-
-  const incomeTrendData = useMemo(() => {
-    const idByName = new Map((categories ?? []).map((c) => [c.name, c.id]))
-    return Array.from({ length: 12 }, (_, i) => {
-      const month = i + 1
-      const row: Record<string, string | number> = { month: `${month}월` }
-      for (const name of INCOME_BUCKETS) {
-        const id = idByName.get(name)
-        row[name] = id != null ? (byCategoryMonth.get(`${id}-${month}`) ?? 0) : 0
-      }
-      return row
-    })
-  }, [categories, byCategoryMonth])
-
-  // "이번 달" 랭킹에 쓸 월을 고른다: 조회 연도가 올해면 이번 달, 아니면 데이터가 있는 가장 최근 달.
-  const monthsList = summary?.months ?? []
-  let latestMonth = year === now.getFullYear() ? monthsList.find((m) => m.month === now.getMonth() + 1) : undefined
-  if (!latestMonth) {
-    for (let i = monthsList.length - 1; i >= 0; i--) {
-      if (monthsList[i].expenseTotal > 0 || monthsList[i].income > 0) {
-        latestMonth = monthsList[i]
-        break
-      }
-    }
-  }
-  const latestMonthNum = latestMonth?.month ?? 12
-
-  const expenseRanking = useMemo(() => {
-    const rows = (categories ?? [])
-      .filter((c) => c.groupType !== 'income' && !c.archivedAt)
-      .map((c) => ({
-        name: c.name,
-        amount: byCategoryMonth.get(`${c.id}-${latestMonthNum}`) ?? 0,
-        color: GROUP_COLOR[c.groupType],
-      }))
-      .filter((r) => r.amount > 0)
-      .sort((a, b) => b.amount - a.amount)
-    const total = rows.reduce((sum, r) => sum + r.amount, 0)
-    return { rows, total }
-  }, [categories, byCategoryMonth, latestMonthNum])
-
-  const incomeRanking = useMemo(() => {
-    const bucket = incomeTrendData[latestMonthNum - 1] ?? {}
-    const rows = INCOME_BUCKETS.map((name, i) => ({
-      name,
-      amount: Number(bucket[name as keyof typeof bucket] ?? 0),
-      color: SUB_PALETTE[i] ?? FALLBACK_SUB_COLOR,
-    }))
-      .filter((r) => r.amount > 0)
-      .sort((a, b) => b.amount - a.amount)
-    const total = rows.reduce((sum, r) => sum + r.amount, 0)
-    return { rows, total }
-  }, [incomeTrendData, latestMonthNum])
-
-  const balanceData = useMemo(
-    () => (summary?.months ?? []).map((m) => ({ month: `${m.month}월`, 잔액: m.balance })),
-    [summary],
-  )
 
   if (loadFailed) {
     return (
-      <div className="flex min-h-svh flex-col bg-bg">
+      <div className="flex min-h-svh flex-col bg-hh-bg">
         <HouseholdNav />
         <div className="flex-1">
           <LoadError screen={false} message="통계를 불러오지 못했어요." onRetry={load} />
@@ -176,174 +103,333 @@ function StatsContent() {
     )
   }
 
-  if (!categories || !entries || !summary) {
+  if (!categories || !entries || !months) {
     return (
-      <div className="flex min-h-svh flex-col bg-bg">
+      <div className="flex min-h-svh flex-col bg-hh-bg">
         <HouseholdNav />
         <Loading />
       </div>
     )
   }
 
-  return (
-    <div className="flex min-h-svh flex-col bg-bg">
-      <HouseholdNav />
-      <div className="flex-1 px-[22px] pb-8">
-        <div className="flex items-center justify-between pt-5">
-          <div className="flex gap-1 rounded-full bg-surface-alt p-1">
-            {(['expense', 'income', 'balance'] as Tab[]).map((t) => (
-              <button
-                key={t}
-                onClick={() => setTab(t)}
-                className={`rounded-full px-3.5 py-1.5 text-[13.5px] font-semibold ${
-                  tab === t ? 'bg-hh-pine text-white' : 'text-ink-muted'
-                }`}
-              >
-                {t === 'expense' ? '지출' : t === 'income' ? '수입' : '잔액'}
-              </button>
-            ))}
-          </div>
-          <select
-            value={year}
-            onChange={(e) => setYear(Number(e.target.value))}
-            className="rounded-xl border border-border bg-surface px-2 py-1 text-[14px] font-semibold"
-          >
-            {[year - 1, year, year + 1].map((y) => (
-              <option key={y} value={y}>
-                {y}년
-              </option>
-            ))}
-          </select>
-        </div>
+  const elapsedSpends = spends.slice(0, monthsElapsed)
+  const yearSpend = elapsedSpends.reduce((a, b) => a + b, 0)
+  const avgSpend = monthsElapsed > 0 ? yearSpend / monthsElapsed : 0
+  const maxSpend = Math.max(...elapsedSpends, 0)
+  const minSpend = elapsedSpends.length ? Math.min(...elapsedSpends) : 0
+  const maxMonthIdx = elapsedSpends.indexOf(maxSpend)
+  const minMonthIdx = elapsedSpends.indexOf(minSpend)
+  const curSpend = spends[currentMonthIdx] ?? 0
+  const prevSpend = currentMonthIdx > 0 ? spends[currentMonthIdx - 1] : null
+  const momPct = prevSpend && prevSpend > 0 ? ((curSpend - prevSpend) / prevSpend) * 100 : null
+  const barScale = 150 / Math.max(maxSpend, 1)
 
+  return (
+    <div className="flex min-h-svh flex-col bg-hh-bg font-hh-sans text-hh-ink">
+      <HouseholdNav />
+      <div className="flex items-center justify-between px-5 pb-3 pt-1">
+        <div className="font-hh-serif text-[24px] font-bold">통계</div>
+        <div className="relative">
+          <button
+            type="button"
+            onClick={() => setYearPickerOpen((v) => !v)}
+            className="flex h-10 items-center gap-1.5 rounded-full border border-hh-border bg-white px-3.5 text-[14px] font-semibold"
+          >
+            {year}년
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#1E2B27" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="m6 9 6 6 6-6" />
+            </svg>
+          </button>
+          {yearPickerOpen && (
+            <>
+              <div className="fixed inset-0 z-10" onClick={() => setYearPickerOpen(false)} />
+              <div className="absolute right-0 top-full z-20 mt-1.5 max-h-[240px] w-[110px] overflow-y-auto rounded-[14px] border border-hh-border bg-white py-1.5 shadow-[0_8px_24px_-8px_rgba(0,0,0,0.18)]">
+                {Array.from({ length: now.getFullYear() - (openingYear ?? now.getFullYear()) + 1 }, (_, i) => (openingYear ?? now.getFullYear()) + i)
+                  .reverse()
+                  .map((y) => (
+                    <button
+                      key={y}
+                      type="button"
+                      onClick={() => {
+                        setYear(y)
+                        setYearPickerOpen(false)
+                      }}
+                      className={`block w-full px-3.5 py-2 text-left text-[14px] font-semibold ${y === year ? 'text-hh-pine' : 'text-hh-ink'}`}
+                    >
+                      {y}년
+                    </button>
+                  ))}
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+
+      <div className="px-5 pb-4">
+        <div className="grid grid-cols-3 gap-1 rounded-[16px] bg-[#EAE3D7] p-1">
+          {(['expense', 'income', 'balance'] as Tab[]).map((t) => (
+            <button
+              key={t}
+              onClick={() => setTab(t)}
+              className={`h-10 rounded-xl text-[14px] font-semibold ${
+                tab === t ? 'bg-white text-hh-pine shadow-[0_2px_8px_-4px_rgba(30,43,39,0.3)]' : 'bg-transparent text-[#5E5D57]'
+              }`}
+            >
+              {t === 'expense' ? '지출' : t === 'income' ? '수입' : '잔액'}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="flex flex-col gap-4 px-5 pb-6">
         {tab === 'expense' && (
           <>
-            <section className="mt-4 rounded-[18px] bg-surface p-4">
-              <h2 className="m-0 mb-2 text-[15px] font-bold">그룹별 월별 지출</h2>
-              <ResponsiveContainer width="100%" height={200}>
-                <LineChart data={trendData}>
-                  <CartesianGrid stroke="#eee7d6" vertical={false} />
-                  <XAxis dataKey="month" tick={{ fontSize: 11 }} interval={1} />
-                  <YAxis tick={{ fontSize: 11 }} width={38} tickFormatter={formatCompactWon} />
-                  <Tooltip formatter={(v: number) => `${formatWon(v)}원`} />
-                  <Line type="monotone" dataKey="카드" stroke={GROUP_COLOR.card} strokeWidth={3} dot={false} />
-                  <Line type="monotone" dataKey="고정비" stroke={GROUP_COLOR.fixed} strokeWidth={1.5} dot={false} opacity={0.55} />
-                  <Line type="monotone" dataKey="통신·공과" stroke={GROUP_COLOR.utility} strokeWidth={1.5} dot={false} opacity={0.55} />
-                  <Line type="monotone" dataKey="기타변동" stroke={GROUP_COLOR.variable} strokeWidth={1.5} dot={false} opacity={0.55} />
-                </LineChart>
-              </ResponsiveContainer>
-              <Legend items={[
-                { label: '카드', color: GROUP_COLOR.card, bold: true },
-                { label: '고정비', color: GROUP_COLOR.fixed },
-                { label: '통신·공과', color: GROUP_COLOR.utility },
-                { label: '기타변동', color: GROUP_COLOR.variable },
-              ]} />
-            </section>
+            <div className="flex flex-col gap-4 rounded-[24px] bg-white p-5">
+              <div className="flex flex-col gap-1">
+                <div className="text-[13px] text-hh-ink-muted">올해 총 지출 · 1–{monthsElapsed}월</div>
+                <div className="flex items-baseline gap-1">
+                  <div className="text-[30px] font-bold tracking-tight">{formatWon(yearSpend)}</div>
+                  <div className="text-[15px] text-hh-ink-muted">원</div>
+                </div>
+              </div>
+              <div className="grid grid-cols-3 gap-2">
+                <MiniStat label="월평균" value={man(avgSpend)} />
+                <MiniStat label={`최다 · ${maxMonthIdx + 1}월`} value={man(maxSpend)} />
+                <MiniStat label={`최소 · ${minMonthIdx + 1}월`} value={man(minSpend)} />
+              </div>
+            </div>
 
-            <section className="mt-4 rounded-[18px] bg-surface p-4">
-              <h2 className="m-0 mb-2 text-[15px] font-bold">카드별 월별 추이</h2>
-              <ResponsiveContainer width="100%" height={200}>
-                <LineChart data={cardTrendData}>
-                  <CartesianGrid stroke="#eee7d6" vertical={false} />
-                  <XAxis dataKey="month" tick={{ fontSize: 11 }} interval={1} />
-                  <YAxis tick={{ fontSize: 11 }} width={38} tickFormatter={formatCompactWon} />
-                  <Tooltip formatter={(v: number) => `${formatWon(v)}원`} />
-                  {cardNames.map((name, i) => (
-                    <Line
-                      key={name}
-                      type="monotone"
-                      dataKey={name}
-                      stroke={SUB_PALETTE[i] ?? FALLBACK_SUB_COLOR}
-                      strokeWidth={2}
-                      dot={false}
+            <div className="flex flex-col gap-4 rounded-[24px] bg-white p-5">
+              <div className="flex items-start justify-between">
+                <div className="flex flex-col gap-1">
+                  <div className="font-hh-serif text-[18px] font-bold">월별 지출 비교</div>
+                  <div className="text-[12px] text-hh-ink-muted">점선은 월평균</div>
+                </div>
+                {momPct !== null && (
+                  <div
+                    className="rounded-full px-2.5 py-1 text-[12px] font-semibold"
+                    style={{ color: momPct <= 0 ? 'var(--color-hh-down)' : 'var(--color-hh-up)', background: momPct <= 0 ? 'var(--color-hh-down-tint)' : 'var(--color-hh-up-tint)' }}
+                  >
+                    {currentMonthIdx + 1}월 {momPct <= 0 ? '▼' : '▲'} {Math.abs(momPct).toFixed(1)}%
+                  </div>
+                )}
+              </div>
+              <div className="relative flex h-[170px] items-end gap-2 border-b border-hh-divider">
+                <div className="absolute left-0 right-0 border-t-[1.5px] border-dashed border-[#B9B3A7]" style={{ bottom: `${avgSpend * barScale}px` }} />
+                {spends.map((v, i) => (
+                  <div key={i} className="flex h-[170px] flex-1 flex-col items-center justify-end gap-1.5">
+                    {i === currentMonthIdx && v > 0 && (
+                      <div className="whitespace-nowrap rounded-lg bg-hh-pine px-1.5 py-0.5 text-[11px] font-bold text-white">{man(v)}</div>
+                    )}
+                    <div
+                      className="w-full rounded-t-lg"
+                      style={{ height: `${Math.max(2, v * barScale)}px`, background: i === currentMonthIdx ? 'var(--color-hh-pine)' : '#DCE5DF' }}
                     />
-                  ))}
-                </LineChart>
-              </ResponsiveContainer>
-              <Legend items={cardNames.map((name, i) => ({ label: name, color: SUB_PALETTE[i] ?? FALLBACK_SUB_COLOR }))} />
-            </section>
+                  </div>
+                ))}
+              </div>
+              <div className="-mt-2.5 flex gap-2">
+                {spends.map((_, i) => (
+                  <div key={i} className={`flex-1 text-center text-[11px] ${i === currentMonthIdx ? 'font-bold text-hh-ink' : 'text-[#8A877E]'}`}>
+                    {i + 1}월
+                  </div>
+                ))}
+              </div>
+            </div>
 
-            <RankingList title={`${latestMonthNum}월 지출 랭킹`} rows={expenseRanking.rows} total={expenseRanking.total} />
+            {cardCategories.length > 0 && (
+              <div className="flex flex-col gap-4 rounded-[24px] bg-white p-5">
+                <div className="font-hh-serif text-[18px] font-bold">카드별 월별 지출</div>
+                <div className="flex flex-wrap gap-x-3.5 gap-y-2">
+                  {cardCategories.map(({ cat, color }) => (
+                    <div key={cat.id} className="flex items-center gap-1.5 text-[12px] text-[#4A4A44]">
+                      <div className="h-2.5 w-2.5 rounded-[3px]" style={{ background: color }} />
+                      {cat.name}
+                    </div>
+                  ))}
+                </div>
+                <div className="flex h-[170px] items-end gap-2 border-b border-hh-divider">
+                  {Array.from({ length: 12 }, (_, i) => i + 1).map((m, i) => {
+                    const total = cardCategories.reduce((s, { cat }) => s + sumFor(cat.id, m), 0)
+                    const scale = 150 / Math.max(maxCardStackTotal(cardCategories, sumFor), 1)
+                    return (
+                      <div key={m} className="flex h-[170px] flex-1 flex-col justify-end gap-0.5" style={{ opacity: i === currentMonthIdx ? 1 : 0.75 }}>
+                        {cardCategories.map(({ cat, color }) => {
+                          const v = sumFor(cat.id, m)
+                          if (v <= 0) return null
+                          return <div key={cat.id} style={{ height: `${Math.max(2, v * scale)}px`, background: color }} className="w-full rounded-[3px]" />
+                        })}
+                        {total === 0 && <div className="w-full" style={{ height: 2 }} />}
+                      </div>
+                    )
+                  })}
+                </div>
+                <div className="-mt-2.5 flex gap-2">
+                  {spends.map((_, i) => (
+                    <div key={i} className={`flex-1 text-center text-[11px] ${i === currentMonthIdx ? 'font-bold text-hh-ink' : 'text-[#8A877E]'}`}>
+                      {i + 1}월
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {cardCategories.length > 0 && currentMonthIdx > 0 && (
+              <div className="flex flex-col gap-4 rounded-[24px] bg-white p-5">
+                <div className="flex items-baseline justify-between">
+                  <div className="font-hh-serif text-[18px] font-bold">카드별 전월 비교</div>
+                  <div className="flex gap-2.5 text-[11px] text-hh-ink-muted">
+                    <div className="flex items-center gap-1">
+                      <div className="h-1 w-2.5 rounded-sm bg-[#D8D1C4]" />
+                      {currentMonthIdx}월
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <div className="h-1 w-2.5 rounded-sm bg-hh-pine" />
+                      {currentMonthIdx + 1}월
+                    </div>
+                  </div>
+                </div>
+                {cardCategories.map(({ cat, color }) => {
+                  const cur = sumFor(cat.id, currentMonthIdx + 1)
+                  const prev = sumFor(cat.id, currentMonthIdx)
+                  const max = Math.max(cur, prev, 1)
+                  const delta = prev > 0 ? ((cur - prev) / prev) * 100 : null
+                  return (
+                    <div key={cat.id} className="flex flex-col gap-1.5">
+                      <div className="flex items-baseline justify-between">
+                        <div className="text-[14px] font-medium">{cat.name}</div>
+                        <div className="flex items-baseline gap-2">
+                          <div className="text-[14px] font-semibold">{formatWon(cur)}</div>
+                          {delta !== null && (
+                            <div className="text-[12px] font-semibold" style={{ color: delta > 0 ? 'var(--color-hh-up)' : 'var(--color-hh-down)' }}>
+                              {delta > 0 ? '▲' : '▼'} {Math.abs(delta).toFixed(1)}%
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                      <div className="flex flex-col gap-[3px]">
+                        <div className="h-1.5 rounded-full bg-[#D8D1C4]" style={{ width: `${(prev / max) * 100}%` }} />
+                        <div className="h-2 rounded-full" style={{ width: `${(cur / max) * 100}%`, background: color }} />
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
           </>
         )}
 
         {tab === 'income' && (
-          <>
-            <section className="mt-4 rounded-[18px] bg-surface p-4">
-              <h2 className="m-0 mb-2 text-[15px] font-bold">항목별 월별 수입</h2>
-              <ResponsiveContainer width="100%" height={220}>
-                <BarChart data={incomeTrendData}>
-                  <CartesianGrid stroke="#eee7d6" vertical={false} />
-                  <XAxis dataKey="month" tick={{ fontSize: 11 }} interval={1} />
-                  <YAxis tick={{ fontSize: 11 }} width={38} tickFormatter={formatCompactWon} />
-                  <Tooltip formatter={(v: number) => `${formatWon(v)}원`} />
-                  {INCOME_BUCKETS.map((name, i) => (
-                    <Bar key={name} dataKey={name} stackId="income" fill={SUB_PALETTE[i] ?? FALLBACK_SUB_COLOR} />
-                  ))}
-                </BarChart>
-              </ResponsiveContainer>
-              <Legend items={INCOME_BUCKETS.map((name, i) => ({ label: name, color: SUB_PALETTE[i] ?? FALLBACK_SUB_COLOR }))} />
-            </section>
-
-            <RankingList title={`${latestMonthNum}월 수입 랭킹`} rows={incomeRanking.rows} total={incomeRanking.total} />
-          </>
+          <div className="flex flex-col gap-4 rounded-[24px] bg-white p-5">
+            <div className="font-hh-serif text-[18px] font-bold">항목별 월별 수입</div>
+            <div className="flex flex-wrap gap-x-3.5 gap-y-2">
+              {INCOME_BUCKETS.map((name, i) => (
+                <div key={name} className="flex items-center gap-1.5 text-[12px] text-[#4A4A44]">
+                  <div className="h-2.5 w-2.5 rounded-[3px]" style={{ background: INCOME_PALETTE[i] }} />
+                  {name}
+                </div>
+              ))}
+            </div>
+            <div className="flex h-[200px] items-end gap-2 border-b border-hh-divider">
+              {Array.from({ length: 12 }, (_, i) => i + 1).map((m) => {
+                const idByName = new Map((categories ?? []).map((c) => [c.name, c.id]))
+                const vals = INCOME_BUCKETS.map((n) => {
+                  const id = idByName.get(n)
+                  return id != null ? sumFor(id, m) : 0
+                })
+                const total = vals.reduce((a, b) => a + b, 0)
+                const scale = 180 / Math.max(...incomes, 1)
+                return (
+                  <div key={m} className="flex h-[200px] flex-1 flex-col justify-end gap-0.5">
+                    {vals.map((v, i) =>
+                      v > 0 ? <div key={i} style={{ height: `${Math.max(2, v * scale)}px`, background: INCOME_PALETTE[i] }} className="w-full rounded-[3px]" /> : null,
+                    )}
+                    {total === 0 && <div className="w-full" style={{ height: 2 }} />}
+                  </div>
+                )
+              })}
+            </div>
+            <div className="-mt-2.5 flex gap-2">
+              {Array.from({ length: 12 }, (_, i) => i + 1).map((m) => (
+                <div key={m} className="flex-1 text-center text-[11px] text-[#8A877E]">
+                  {m}월
+                </div>
+              ))}
+            </div>
+          </div>
         )}
 
         {tab === 'balance' && (
-          <section className="mt-4 rounded-[18px] border-t-4 border-hh-gold bg-surface p-4">
-            <h2 className="m-0 mb-2 text-[15px] font-bold">누적 잔액 추이</h2>
-            <ResponsiveContainer width="100%" height={260}>
-              <LineChart data={balanceData}>
-                <CartesianGrid stroke="#eee7d6" vertical={false} />
-                <XAxis dataKey="month" tick={{ fontSize: 11 }} interval={1} />
-                <YAxis tick={{ fontSize: 11 }} width={42} tickFormatter={formatCompactWon} />
-                <Tooltip formatter={(v: number) => `${formatWon(v)}원`} />
-                <Line type="monotone" dataKey="잔액" stroke={GROUP_COLOR.income} strokeWidth={3} dot={false} />
-              </LineChart>
-            </ResponsiveContainer>
-          </section>
+          <BalanceChart balances={balances} currentMonthIdx={currentMonthIdx} />
         )}
       </div>
+
+      <HouseholdBottomNav />
     </div>
   )
 }
 
-function Legend({ items }: { items: { label: string; color: string; bold?: boolean }[] }) {
+function maxCardStackTotal(cardCategories: { cat: ExpenseCategory }[], sumFor: (id: number, m: number) => number) {
+  let max = 0
+  for (let m = 1; m <= 12; m++) {
+    const total = cardCategories.reduce((s, { cat }) => s + sumFor(cat.id, m), 0)
+    if (total > max) max = total
+  }
+  return max
+}
+
+function MiniStat({ label, value }: { label: string; value: string }) {
   return (
-    <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1">
-      {items.map((it) => (
-        <div key={it.label} className="flex items-center gap-1.5">
-          <span className="h-2 w-2 rounded-full" style={{ backgroundColor: it.color }} />
-          <span className={`text-[12px] ${it.bold ? 'font-bold text-ink' : 'text-ink-muted'}`}>{it.label}</span>
-        </div>
-      ))}
+    <div className="flex flex-col gap-1 rounded-[16px] bg-hh-bg p-3">
+      <div className="text-[11px] text-hh-ink-muted">{label}</div>
+      <div className="text-[14px] font-bold">{value}</div>
     </div>
   )
 }
 
-function RankingList({
-  title,
-  rows,
-  total,
-}: {
-  title: string
-  rows: { name: string; amount: number; color: string }[]
-  total: number
-}) {
-  if (rows.length === 0) return null
+function BalanceChart({ balances, currentMonthIdx }: { balances: number[]; currentMonthIdx: number }) {
+  const W = 310
+  const top = 150
+  const maxY = Math.max(...balances, 1) * 1.15
+  const pts = balances.map((v, i) => [i * (W / Math.max(balances.length - 1, 1)), top - (v / maxY) * 140] as const)
+  let d = pts.length ? `M${pts[0][0].toFixed(1)} ${pts[0][1].toFixed(1)}` : ''
+  for (let i = 1; i < pts.length; i++) {
+    const [x0, y0] = pts[i - 1]
+    const [x1, y1] = pts[i]
+    const mx = (x0 + x1) / 2
+    d += ` C${mx.toFixed(1)} ${y0.toFixed(1)} ${mx.toFixed(1)} ${y1.toFixed(1)} ${x1.toFixed(1)} ${y1.toFixed(1)}`
+  }
+  const areaD = d ? `${d} L${W} ${top} L0 ${top} Z` : ''
+
   return (
-    <section className="mt-4 rounded-[18px] bg-surface p-4">
-      <h2 className="m-0 mb-1 text-[15px] font-bold">{title}</h2>
-      {rows.map((r) => (
-        <div key={r.name} className="flex items-center gap-3 border-b border-hh-divider py-3 last:border-b-0">
-          <div className="h-8 w-[3px] flex-none rounded-full" style={{ backgroundColor: r.color }} />
-          <div className="flex-1 text-[14.5px] font-medium">{r.name}</div>
-          <div className="text-right">
-            <div className="text-[14.5px] font-semibold tabular-nums">{formatWon(r.amount)}원</div>
-            <div className="text-[12px] text-ink-muted">{total > 0 ? Math.round((r.amount / total) * 100) : 0}%</div>
-          </div>
+    <div className="flex flex-col gap-3.5 rounded-[24px] bg-white p-5">
+      <div className="flex items-start justify-between">
+        <div className="flex flex-col gap-1">
+          <div className="font-hh-serif text-[18px] font-bold">누적 잔액 추이</div>
+          <div className="text-[12px] text-hh-ink-muted">매달 남은 돈을 쌓아 본 흐름</div>
         </div>
-      ))}
-    </section>
+        <div className="flex flex-col items-end">
+          <div className="text-[17px] font-bold text-hh-pine">{formatWon(balances[currentMonthIdx] ?? 0)}</div>
+          <div className="text-[11px] text-hh-ink-muted">{currentMonthIdx + 1}월 말 기준</div>
+        </div>
+      </div>
+      <div className="relative">
+        <svg width="100%" height="170" viewBox="0 0 310 170" preserveAspectRatio="none" style={{ display: 'block' }}>
+          <line x1="0" y1="18.75" x2="310" y2="18.75" stroke="#F1ECE3" strokeWidth="1" />
+          <line x1="0" y1="62.5" x2="310" y2="62.5" stroke="#F1ECE3" strokeWidth="1" />
+          <line x1="0" y1="106.25" x2="310" y2="106.25" stroke="#F1ECE3" strokeWidth="1" />
+          <line x1="0" y1="150" x2="310" y2="150" stroke="#ECE6DC" strokeWidth="1" />
+          {areaD && <path d={areaD} fill="#8FAE9E" fillOpacity="0.22" />}
+          {d && <path d={d} fill="none" stroke="#22433B" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />}
+        </svg>
+        <div className="absolute left-0 top-[10px] text-[10px] text-[#8A877E]">{man(0.75 * Math.max(...balances, 1) * 1.15)}</div>
+        <div className="absolute left-0 top-[98px] text-[10px] text-[#8A877E]">{man(0.25 * Math.max(...balances, 1) * 1.15)}</div>
+      </div>
+      <div className="flex justify-between text-[11px] text-hh-ink-muted">
+        {[1, 3, 5, 7, 9, 11].map((m) => (
+          <div key={m}>{m}월</div>
+        ))}
+      </div>
+    </div>
   )
 }

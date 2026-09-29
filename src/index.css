@@ -29,18 +29,33 @@
   --color-gold: #a5790a;
   --color-gold-tint: #fbf1da;
 
-  --color-hh-pine: #123A34;
-  --color-hh-pine-tint: #E3E7E1;
-  --color-hh-clay: #A2432E;
-  --color-hh-clay-tint: #F3DFD8;
+  --color-hh-bg: #F5F1EA;
+  --color-hh-ink: #1E2B27;
+  --color-hh-ink-muted: #6B6A63;
+  --color-hh-border: #E4DDD1;
+  --color-hh-pine: #22433B;
+  --color-hh-pine-tint: #E3ECE6;
+  --color-hh-clay: #C06A3E;
+  --color-hh-clay-tint: #F3E4D8;
+  --color-hh-sage: #8FAE9E;
+  --color-hh-sage-tint: #E4EEE7;
+  --color-hh-tan: #D9C39C;
+  --color-hh-tan-tint: #F4EEE2;
   --color-hh-gold: #B98A3D;
   --color-hh-gold-tint: #F4E9D2;
-  --color-hh-neutral: #8a8674;
-  --color-hh-divider: #eee7d6;
+  --color-hh-neutral: #B3AEA3;
+  --color-hh-divider: #ECE6DC;
+  --color-hh-up: #A5522B;
+  --color-hh-up-tint: #F7E6DC;
+  --color-hh-down: #2F6B4F;
+  --color-hh-down-tint: #E4EEE7;
 
   --font-kr: 'Noto Sans KR', system-ui, sans-serif;
   /* 영어 단어용: 읽기를 배우는 아이들을 위해 만든 글꼴 (a가 한 층, I/l/1 구분이 확실) */
   --font-display: 'Andika', 'Noto Sans KR', system-ui, sans-serif;
+  /* 가계부 전용: JunsVoca와 의도적으로 구분되는 톤(세리프 헤딩 + 전용 산세리프 본문) */
+  --font-hh-serif: 'Gowun Batang', serif;
+  --font-hh-sans: 'IBM Plex Sans KR', system-ui, sans-serif;
 }
 
 body {
