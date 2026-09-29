@@ -202,6 +202,22 @@ function HouseholdContent() {
     return rows.map((r) => ({ ...r, bar: (r.amount / max) * 100 }))
   }, [categories, sumsByCategoryMonth, month])
 
+  // 현대카드+우리카드는 와이프가 같이 쓰고 있어서 합산해서 보여주고 복사할 수 있게 한다.
+  const wifeCardsTotal = useMemo(() => {
+    const names = new Set(['현대카드', '우리카드'])
+    return cardStats.filter((c) => names.has(c.name)).reduce((sum, c) => sum + c.amount, 0)
+  }, [cardStats])
+  const [copied, setCopied] = useState(false)
+  async function copyWifeCardsTotal() {
+    try {
+      await navigator.clipboard.writeText(formatWon(wifeCardsTotal))
+      setCopied(true)
+      setTimeout(() => setCopied(false), 1500)
+    } catch (e) {
+      // 클립보드 API를 못 쓰는 환경이면 조용히 무시한다.
+    }
+  }
+
   const sections = useMemo(() => {
     return GROUP_ORDER.map((group) => {
       const cats = activeByGroup[group]
@@ -350,7 +366,7 @@ function HouseholdContent() {
           <div className="flex flex-col gap-4 rounded-[24px] bg-white p-5">
             <div className="flex items-baseline justify-between">
               <div className="font-hh-serif text-[18px] font-bold">지출 구성</div>
-              <Link to="/household/stats" className="text-[13px] font-semibold no-underline text-hh-pine">
+              <Link to="/household/stats" replace className="text-[13px] font-semibold no-underline text-hh-pine">
                 통계 보기
               </Link>
             </div>
@@ -415,6 +431,20 @@ function HouseholdContent() {
                 </div>
               </button>
             ))}
+
+            {wifeCardsTotal > 0 && (
+              <div className="flex items-center gap-2.5 rounded-[14px] bg-hh-bg px-3 py-3">
+                <div className="flex-1 text-[13px] font-semibold text-hh-ink-muted">현대카드+우리카드 (와이프)</div>
+                <div className="text-[15px] font-bold text-hh-ink">{formatWon(wifeCardsTotal)}</div>
+                <button
+                  type="button"
+                  onClick={copyWifeCardsTotal}
+                  className="flex-none rounded-full border border-hh-border bg-white px-2.5 py-1 text-[12px] font-semibold text-hh-pine"
+                >
+                  {copied ? '복사됨' : '복사'}
+                </button>
+              </div>
+            )}
           </div>
         )}
 

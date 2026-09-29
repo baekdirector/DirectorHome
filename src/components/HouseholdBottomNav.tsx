@@ -46,6 +46,7 @@ export function HouseholdBottomNav() {
           <Link
             key={tab.to}
             to={tab.to}
+            replace
             className="flex min-w-16 flex-col items-center gap-1 py-2 no-underline"
             style={{ color }}
           >

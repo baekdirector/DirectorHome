@@ -11,10 +11,12 @@ import { ParentSessionDetail } from './pages/ParentSessionDetail'
 import { Household } from './pages/Household'
 import { HouseholdCategories } from './pages/HouseholdCategories'
 import { HouseholdStats } from './pages/HouseholdStats'
+import { HouseholdBackGuard } from './components/HouseholdBackGuard'
 
 function App() {
   return (
     <BrowserRouter>
+      <HouseholdBackGuard />
       <Routes>
         <Route path="/" element={<Home />} />
         <Route path="/input" element={<TextInput />} />
