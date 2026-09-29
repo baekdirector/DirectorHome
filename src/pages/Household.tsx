@@ -138,12 +138,17 @@ function HouseholdContent() {
   const spendPct = income > 0 ? Math.min(100, (expenseTotal / income) * 100) : 0
   const momAmt = prevMonthSummary ? prevMonthSummary.expenseTotal - expenseTotal : null
   const momPct = prevMonthSummary && prevMonthSummary.expenseTotal > 0 ? ((momAmt ?? 0) / prevMonthSummary.expenseTotal) * 100 : null
+  // 올해 1월 시작 전(=작년 12월 말) 잔액. 1월 요약의 balance에서 1월 순증감을 빼면 나온다.
+  const yearOpeningBalance = useMemo(() => {
+    const jan = summary?.find((m) => m.month === 1)
+    return jan ? jan.balance - jan.net : 0
+  }, [summary])
   const ytdIncome = useMemo(() => {
     if (!summary) return 0
-    let sum = 0
+    let sum = yearOpeningBalance
     for (const m of summary) if (m.month <= month) sum += m.income
     return sum
-  }, [summary, month])
+  }, [summary, month, yearOpeningBalance])
   const ytdExpense = useMemo(() => {
     if (!summary) return 0
     let sum = 0
@@ -335,7 +340,7 @@ function HouseholdContent() {
             chip={momPct !== null ? `${momPct >= 0 ? '▼' : '▲'} ${Math.abs(momPct).toFixed(1)}%` : undefined}
             chipBad={momPct !== null && momPct < 0}
           />
-          <KpiCard label={`올해 누적 수입 · 1–${month}월`} value={formatWon(ytdIncome)} />
+          <KpiCard label={`올해 가용 자금 · 1–${month}월`} value={formatWon(ytdIncome)} sub={`이월 ${formatWon(yearOpeningBalance)}원 포함`} />
           <KpiCard label="가장 큰 지출" value={topSpend ? formatWon(topSpend.amount) : '—'} sub={topSpend?.name ?? '등록된 지출 없음'} />
           <KpiCard label={`올해 누적 지출 · 1–${month}월`} value={formatWon(ytdExpense)} />
         </div>
