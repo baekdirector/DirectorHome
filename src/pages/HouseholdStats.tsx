@@ -181,7 +181,7 @@ function StatsContent() {
         </div>
       </div>
 
-      <div className="flex flex-col gap-4 px-5 pb-6">
+      <div className="flex flex-col gap-4 px-5 pb-24">
         {tab === 'expense' && (
           <>
             <div className="flex flex-col gap-4 rounded-[24px] bg-white p-5">

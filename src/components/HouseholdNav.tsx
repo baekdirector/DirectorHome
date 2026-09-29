@@ -12,13 +12,7 @@ export function HouseholdNav() {
         aria-label="서비스 전환 메뉴 열기"
         className="flex items-center gap-2.5"
       >
-        <div className="flex h-9 w-9 flex-none items-center justify-center rounded-xl bg-hh-pine">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#F5F1EA" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M3 10.5 12 3l9 7.5" />
-            <path d="M5 9.5V20h14V9.5" />
-            <path d="M10 20v-5h4v5" />
-          </svg>
-        </div>
+        <img src="/icons/icon-192.png" alt="" width={36} height={36} className="h-9 w-9 flex-none rounded-[10px]" />
         <span className="font-hh-serif text-[19px] font-bold tracking-tight text-hh-ink">우리집 가계부</span>
       </button>
       <AppDrawer open={drawerOpen} onClose={() => setDrawerOpen(false)} />

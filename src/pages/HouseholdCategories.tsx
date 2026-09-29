@@ -92,7 +92,7 @@ function CategoriesContent() {
   return (
     <div className="flex min-h-svh flex-col bg-hh-bg font-hh-sans text-hh-ink">
       <HouseholdNav />
-      <div className="flex-1 px-5 pb-6">
+      <div className="flex-1 px-5 pb-24">
         <h1 className="pt-3 font-hh-serif text-[20px] font-bold">카테고리 관리</h1>
 
         <div className="mt-4 flex gap-2">

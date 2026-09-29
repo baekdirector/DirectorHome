@@ -128,7 +128,6 @@ function HouseholdContent() {
   const monthSummary = summary ? findMonthSummaryArr(summary, month) : undefined
   const prevMonthSummary = summary && month > 1 ? findMonthSummaryArr(summary, month - 1) : undefined
 
-  const daysInMonth = new Date(year, month, 0).getDate()
   const income = monthSummary?.income ?? 0
   const expenseTotal = monthSummary?.expenseTotal ?? 0
   const netThisMonth = monthSummary?.net ?? 0
@@ -139,11 +138,16 @@ function HouseholdContent() {
   const spendPct = income > 0 ? Math.min(100, (expenseTotal / income) * 100) : 0
   const momAmt = prevMonthSummary ? prevMonthSummary.expenseTotal - expenseTotal : null
   const momPct = prevMonthSummary && prevMonthSummary.expenseTotal > 0 ? ((momAmt ?? 0) / prevMonthSummary.expenseTotal) * 100 : null
-  const dailyAvg = expenseTotal / daysInMonth
-  const ytdNet = useMemo(() => {
+  const ytdIncome = useMemo(() => {
     if (!summary) return 0
     let sum = 0
-    for (const m of summary) if (m.month <= month) sum += m.net
+    for (const m of summary) if (m.month <= month) sum += m.income
+    return sum
+  }, [summary, month])
+  const ytdExpense = useMemo(() => {
+    if (!summary) return 0
+    let sum = 0
+    for (const m of summary) if (m.month <= month) sum += m.expenseTotal
     return sum
   }, [summary, month])
 
@@ -282,7 +286,7 @@ function HouseholdContent() {
         </button>
       </div>
 
-      <div className="flex flex-col gap-4 px-5 pb-6">
+      <div className="flex flex-col gap-4 px-5 pb-24">
         {/* 히어로 */}
         <div className="flex flex-col gap-[18px] rounded-[28px] bg-hh-pine p-6 text-white shadow-[0_18px_40px_-24px_rgba(34,67,59,0.7)]">
           <div className="flex items-center justify-between">
@@ -329,10 +333,11 @@ function HouseholdContent() {
             label="전월 대비 지출"
             value={momAmt !== null ? `${momAmt >= 0 ? '−' : '+'}${formatWon(Math.abs(momAmt))}` : '—'}
             chip={momPct !== null ? `${momPct >= 0 ? '▼' : '▲'} ${Math.abs(momPct).toFixed(1)}%` : undefined}
+            chipBad={momPct !== null && momPct < 0}
           />
-          <KpiCard label="하루 평균 지출" value={formatWon(dailyAvg)} sub={`${daysInMonth}일 기준`} />
+          <KpiCard label={`올해 누적 수입 · 1–${month}월`} value={formatWon(ytdIncome)} />
           <KpiCard label="가장 큰 지출" value={topSpend ? formatWon(topSpend.amount) : '—'} sub={topSpend?.name ?? '등록된 지출 없음'} />
-          <KpiCard label="올해 누적 순증감" value={`${ytdNet >= 0 ? '+' : '−'}${formatWon(Math.abs(ytdNet))}`} sub={`1–${month}월 합계`} />
+          <KpiCard label={`올해 누적 지출 · 1–${month}월`} value={formatWon(ytdExpense)} />
         </div>
 
         {/* 지출 구성 */}
@@ -472,13 +477,33 @@ function findMonthSummaryArr(months: ExpenseMonthSummary[], month: number) {
   return months.find((m) => m.month === month)
 }
 
-function KpiCard({ label, value, sub, chip }: { label: string; value: string; sub?: string; chip?: string }) {
+function KpiCard({
+  label,
+  value,
+  sub,
+  chip,
+  chipBad,
+}: {
+  label: string
+  value: string
+  sub?: string
+  chip?: string
+  chipBad?: boolean
+}) {
   return (
     <div className="flex flex-col gap-2 rounded-[22px] bg-white p-4">
       <div className="text-[12px] text-hh-ink-muted">{label}</div>
-      <div className="text-[18px] font-bold">{value}</div>
+      <div className="text-[22px] font-bold tabular-nums">{value}</div>
       {chip && (
-        <div className="self-start rounded-full bg-hh-down-tint px-2 py-0.5 text-[12px] font-semibold text-hh-down">{chip}</div>
+        <div
+          className="self-start rounded-full px-2 py-0.5 text-[12px] font-semibold"
+          style={{
+            color: chipBad ? 'var(--color-hh-up)' : 'var(--color-hh-down)',
+            background: chipBad ? 'var(--color-hh-up-tint)' : 'var(--color-hh-down-tint)',
+          }}
+        >
+          {chip}
+        </div>
       )}
       {sub && <div className="text-[12px] text-hh-ink-muted">{sub}</div>}
     </div>

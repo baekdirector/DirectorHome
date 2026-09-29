@@ -30,11 +30,15 @@ const TABS = [
   },
 ]
 
-/** 가계부 화면 하단 탭바(요약·입력/통계/관리). 상단 좌측 드로우어 트리거(HouseholdNav)와는 별개다. */
+/**
+ * 가계부 화면 하단 탭바(요약·입력/통계/관리). 상단 좌측 드로우어 트리거(HouseholdNav)와는 별개다.
+ * 화면 내용이 한 화면보다 길어서 스크롤이 생기므로, fixed로 항상 화면 하단에 고정한다
+ * (각 페이지는 이 바에 가려지지 않도록 하단 padding을 둬야 한다).
+ */
 export function HouseholdBottomNav() {
   const { pathname } = useLocation()
   return (
-    <div className="mt-auto flex justify-around border-t border-hh-divider bg-white px-3 pb-6 pt-2">
+    <div className="fixed inset-x-0 bottom-0 z-30 flex justify-around border-t border-hh-divider bg-white px-3 pb-6 pt-2">
       {TABS.map((tab) => {
         const active = pathname === tab.to
         const color = active ? 'var(--color-hh-pine)' : 'var(--color-hh-ink-muted)'

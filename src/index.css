@@ -53,8 +53,9 @@
   --font-kr: 'Noto Sans KR', system-ui, sans-serif;
   /* 영어 단어용: 읽기를 배우는 아이들을 위해 만든 글꼴 (a가 한 층, I/l/1 구분이 확실) */
   --font-display: 'Andika', 'Noto Sans KR', system-ui, sans-serif;
-  /* 가계부 전용: JunsVoca와 의도적으로 구분되는 톤(세리프 헤딩 + 전용 산세리프 본문) */
-  --font-hh-serif: 'Gowun Batang', serif;
+  /* 가계부 전용: 세리프는 화면에서 궁서체처럼 옛스러워 보인다는 피드백으로 제외하고,
+     헤딩·본문 모두 하나의 산세리프로 통일한다. */
+  --font-hh-serif: 'IBM Plex Sans KR', system-ui, sans-serif;
   --font-hh-sans: 'IBM Plex Sans KR', system-ui, sans-serif;
 }
 
