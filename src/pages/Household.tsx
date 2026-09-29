@@ -6,6 +6,7 @@ import { HouseholdBottomNav } from '../components/HouseholdBottomNav'
 import { LoadError } from '../components/LoadError'
 import { Loading } from '../components/Loading'
 import { EditEntryModal } from '../components/EditEntryModal'
+import { StatementImportModal } from '../components/StatementImportModal'
 import { registerHouseholdOverlay } from '../lib/householdOverlay'
 import {
   createEntry,
@@ -64,6 +65,8 @@ function HouseholdContent() {
   const [entriesFailed, setEntriesFailed] = useState(false)
   const [pickerOpen, setPickerOpen] = useState(false)
   const [editing, setEditing] = useState<ExpenseCategory | null>(null)
+  const [importOpen, setImportOpen] = useState(false)
+  const [toast, setToast] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const entriesRequestIdRef = useRef(0)
 
@@ -76,6 +79,16 @@ function HouseholdContent() {
     if (!pickerOpen) return
     return registerHouseholdOverlay(() => setPickerOpen(false))
   }, [pickerOpen])
+  useEffect(() => {
+    if (!importOpen) return
+    return registerHouseholdOverlay(() => setImportOpen(false))
+  }, [importOpen])
+
+  useEffect(() => {
+    if (!toast) return
+    const id = setTimeout(() => setToast(null), 4000)
+    return () => clearTimeout(id)
+  }, [toast])
 
   const retryCategories = async () => {
     setCategoriesFailed(false)
@@ -459,7 +472,16 @@ function HouseholdContent() {
         )}
 
         {/* 입력 내역 */}
-        <div className="pt-1 font-hh-serif text-[18px] font-bold">{month}월 입력 내역</div>
+        <div className="flex items-center justify-between pt-1">
+          <div className="font-hh-serif text-[18px] font-bold">{month}월 입력 내역</div>
+          <button
+            type="button"
+            onClick={() => setImportOpen(true)}
+            className="rounded-full border border-hh-border bg-white px-3 py-1.5 text-[12px] font-semibold text-hh-pine"
+          >
+            PDF 가져오기
+          </button>
+        </div>
         {sections.map((s) => (
           <div key={s.group} className="flex flex-col rounded-[24px] bg-white px-2 pb-1.5 pt-1">
             <div className="flex items-center justify-between px-3 py-2.5">
@@ -514,6 +536,27 @@ function HouseholdContent() {
         onConfirm={(amount) => editing && saveSingleEntry(editing.id, amount)}
         onCancel={() => setEditing(null)}
       />
+
+      {importOpen && (
+        <StatementImportModal
+          categories={categories ?? []}
+          entries={entries ?? []}
+          onClose={() => setImportOpen(false)}
+          onSaved={(message) => {
+            setImportOpen(false)
+            setToast(message)
+            retryEntries()
+          }}
+        />
+      )}
+
+      {toast && (
+        <div className="pointer-events-none fixed inset-x-0 bottom-24 z-40 flex justify-center px-5">
+          <div className="rounded-full bg-hh-ink px-4 py-2.5 text-[13px] font-semibold text-white shadow-lg">
+            {toast}
+          </div>
+        </div>
+      )}
     </div>
   )
 }
