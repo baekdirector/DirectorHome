@@ -303,7 +303,15 @@ function StatsContent() {
                     const selected = cardCategories.find(({ cat }) => cat.id === selectedCardId)
                     if (!selected) return null
                     const values = Array.from({ length: 12 }, (_, i) => sumFor(selected.cat.id, i + 1))
-                    return <SingleCardLineChart name={selected.cat.name} color={selected.color} values={values} currentMonthIdx={currentMonthIdx} />
+                    return (
+                      <SingleCardLineChart
+                        key={selected.cat.id}
+                        name={selected.cat.name}
+                        color={selected.color}
+                        values={values}
+                        currentMonthIdx={currentMonthIdx}
+                      />
+                    )
                   })()
                 )}
               </div>
@@ -432,6 +440,7 @@ function SingleCardLineChart({
   values: number[]
   currentMonthIdx: number
 }) {
+  const [selectedIdx, setSelectedIdx] = useState(currentMonthIdx)
   const W = 310
   const top = 150
   const maxY = Math.max(...values, 1) * 1.15
@@ -451,7 +460,7 @@ function SingleCardLineChart({
           {name} 월별 추이
         </div>
         <div className="text-[16px] font-bold" style={{ color }}>
-          {formatWon(values[currentMonthIdx] ?? 0)}
+          {selectedIdx + 1}월 {formatWon(values[selectedIdx] ?? 0)}
         </div>
       </div>
       <div className="relative">
@@ -460,9 +469,32 @@ function SingleCardLineChart({
           <line x1="0" y1="62.5" x2="310" y2="62.5" stroke="#F1ECE3" strokeWidth="1" />
           <line x1="0" y1="106.25" x2="310" y2="106.25" stroke="#F1ECE3" strokeWidth="1" />
           <line x1="0" y1="150" x2="310" y2="150" stroke="#ECE6DC" strokeWidth="1" />
-          {d && <path d={d} fill="none" stroke={color} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />}
+          {selectedIdx >= 0 && (
+            <line x1={pts[selectedIdx][0]} y1="0" x2={pts[selectedIdx][0]} y2="150" stroke={color} strokeWidth="1" strokeDasharray="3 3" opacity={0.4} />
+          )}
+          {d && <path d={d} fill="none" stroke={color} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />}
           {pts.map(([x, y], i) => (
-            <circle key={i} cx={x} cy={y} r={i === currentMonthIdx ? 4.5 : 2.5} fill={color} />
+            <circle
+              key={i}
+              cx={x}
+              cy={y}
+              r={i === selectedIdx ? 5 : 2.5}
+              fill={color}
+              stroke={i === selectedIdx ? '#FFFFFF' : 'none'}
+              strokeWidth={1.5}
+            />
+          ))}
+          {/* 실제 터치 영역은 점보다 넉넉하게 잡는다(모바일에서 작은 점을 정확히 누르기 어려우므로). */}
+          {pts.map(([x, y], i) => (
+            <circle
+              key={`hit-${i}`}
+              cx={x}
+              cy={y}
+              r={14}
+              fill="transparent"
+              onClick={() => setSelectedIdx(i)}
+              style={{ cursor: 'pointer' }}
+            />
           ))}
         </svg>
         <div className="absolute left-0 top-[10px] text-[10px] text-[#8A877E]">{man(0.75 * maxY)}</div>
@@ -470,9 +502,14 @@ function SingleCardLineChart({
       </div>
       <div className="flex gap-2">
         {values.map((_, i) => (
-          <div key={i} className={`flex-1 text-center text-[11px] ${i === currentMonthIdx ? 'font-bold text-hh-ink' : 'text-[#8A877E]'}`}>
+          <button
+            key={i}
+            type="button"
+            onClick={() => setSelectedIdx(i)}
+            className={`flex-1 border-none bg-transparent text-center text-[11px] ${i === selectedIdx ? 'font-bold text-hh-ink' : 'text-[#8A877E]'}`}
+          >
             {i + 1}월
-          </div>
+          </button>
         ))}
       </div>
     </div>
