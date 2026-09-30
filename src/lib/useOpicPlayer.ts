@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import {
+  currentVoices,
   isSpeechSupported,
   loadVoices,
   pickVoice,
@@ -71,55 +72,70 @@ export function useOpicPlayer(track: PlayerTrack) {
     setIndex(null)
   }, [])
 
-  /** from부터 끝까지 이어 읽는다. QUESTION_INDEX면 질문부터. */
-  const playFrom = useCallback(
-    async (from: number) => {
+  /** 안드로이드는 한 번 읽어본 뒤에야 음성 목록이 채워지기도 한다. 발화 뒤 다시 들여다본다. */
+  const refreshVoices = useCallback(() => {
+    const now = currentVoices()
+    if (now.length > 0) setVoices((prev) => (prev.length === now.length ? prev : now))
+  }, [])
+
+  /** 답변을 from번째 문장부터 끝까지 읽는다. 질문은 읽지 않는다. */
+  const playAnswer = useCallback(
+    async (from = 0) => {
       if (!supported) return
       sessionRef.current += 1
       const session = sessionRef.current
       stopSpeaking()
       setPlaying(true)
 
-      const steps: Array<{ at: number; text: string; voice: SpeechSynthesisVoice | null }> = []
-      if (from === QUESTION_INDEX && track.question.trim() !== '') {
-        steps.push({ at: QUESTION_INDEX, text: speakableText(track.question), voice: femaleVoice })
-      }
-      const start = from === QUESTION_INDEX ? 0 : from
-      for (let i = start; i < track.lines.length; i++) {
-        steps.push({ at: i, text: speakableText(track.lines[i]), voice: maleVoice })
-      }
-
-      for (const step of steps) {
+      for (let i = Math.max(0, from); i < track.lines.length; i++) {
         if (sessionRef.current !== session) return
-        setIndex(step.at)
-        if (step.text === '') continue
-        await speakLine(step.text, { voice: step.voice, rate: rateRef.current })
-        // 질문과 답변 사이는 실제 시험처럼 한 박자 쉰다.
-        if (step.at === QUESTION_INDEX) {
-          await new Promise((r) => setTimeout(r, 1200))
-        }
+        setIndex(i)
+        const text = speakableText(track.lines[i])
+        if (text === '') continue
+        await speakLine(text, { voice: maleVoice, rate: rateRef.current })
+        refreshVoices()
       }
 
       if (sessionRef.current !== session) return
       setPlaying(false)
       setIndex(null)
     },
-    [supported, track.question, track.lines, femaleVoice, maleVoice],
+    [supported, track.lines, maleVoice, refreshVoices],
   )
+
+  /** 에바의 질문만 읽는다. */
+  const playQuestion = useCallback(async () => {
+    if (!supported || track.question.trim() === '') return
+    sessionRef.current += 1
+    const session = sessionRef.current
+    stopSpeaking()
+    setPlaying(true)
+    setIndex(QUESTION_INDEX)
+
+    await speakLine(speakableText(track.question), { voice: femaleVoice, rate: rateRef.current })
+    refreshVoices()
+
+    if (sessionRef.current !== session) return
+    setPlaying(false)
+    setIndex(null)
+  }, [supported, track.question, femaleVoice, refreshVoices])
 
   const toggle = useCallback(() => {
     if (playing) stop()
-    else playFrom(track.question.trim() !== '' ? QUESTION_INDEX : 0)
-  }, [playing, stop, playFrom, track.question])
+    else playAnswer(0)
+  }, [playing, stop, playAnswer])
 
   const setRate = useCallback(
     (r: Rate) => {
       setRateState(r)
       localStorage.setItem(RATE_KEY, String(r))
       // 재생 중이면 지금 문장부터 새 속도로 다시 읽는다(Web Speech는 도중 속도 변경이 안 된다).
-      if (playing) playFrom(index ?? QUESTION_INDEX)
+      if (playing) {
+        if (index === QUESTION_INDEX) playQuestion()
+        else playAnswer(index ?? 0)
+      }
     },
-    [playing, index, playFrom],
+    [playing, index, playQuestion, playAnswer],
   )
 
   const setVoiceName = useCallback((gender: 'male' | 'female', name: string) => {
@@ -142,7 +158,9 @@ export function useOpicPlayer(track: PlayerTrack) {
     setRate,
     playing,
     index,
-    playFrom,
+    playAnswer,
+    playQuestion,
+    refreshVoices,
     toggle,
     stop,
   }

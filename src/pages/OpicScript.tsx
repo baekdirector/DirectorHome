@@ -126,9 +126,8 @@ function OpicScriptContent() {
   }, [qid])
 
   const stepBy = (delta: number) => {
-    const from = player.index ?? QUESTION_INDEX
-    const target = Math.max(QUESTION_INDEX, Math.min(lines.length - 1, from + delta))
-    player.playFrom(target)
+    const from = player.index !== null && player.index >= 0 ? player.index : 0
+    player.playAnswer(Math.max(0, Math.min(lines.length - 1, from + delta)))
   }
 
   return (
@@ -166,15 +165,17 @@ function OpicScriptContent() {
               {/* 에바 질문 카드. 롤플레이처럼 영어 질문이 없는 문항에는 그리지 않는다. */}
               {question.questionEn.trim() !== '' && (
                 <section
-                  className={`flex gap-4 rounded-2xl border bg-op-eva-tint p-4 lg:p-5 ${
+                  className={`flex flex-col gap-3 rounded-2xl border bg-op-eva-tint p-4 lg:p-5 ${
                     player.index === QUESTION_INDEX ? 'border-op-eva ring-2 ring-op-eva/30' : 'border-[#E8C9DA]'
                   }`}
                 >
-                  <span className="flex h-10 w-10 flex-none items-center justify-center rounded-full bg-op-eva text-[13px] font-bold text-white">
-                    Eva
-                  </span>
-                  <div className="flex min-w-0 flex-col gap-1.5">
-                    <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
+                  {/* 제목 줄에만 Eva 배지를 두고, 질문 본문은 카드 폭을 그대로 쓰게 한다.
+                      버튼을 본문 옆에 두면 텍스트가 서너 단어씩 끊겨 읽기 나쁘다. */}
+                  <div className="flex items-start gap-3">
+                    <span className="flex h-9 w-9 flex-none items-center justify-center rounded-full bg-op-eva text-[12px] font-bold text-white">
+                      Eva
+                    </span>
+                    <div className="flex min-w-0 flex-col gap-0.5">
                       <span className="text-[15px] font-semibold">{question.titleKo}</span>
                       {question.altTitles.map((t) => (
                         <span key={t} className="text-[12px] text-[#6E2A50]">
@@ -182,17 +183,22 @@ function OpicScriptContent() {
                         </span>
                       ))}
                     </div>
-                    <p className="m-0 whitespace-pre-line font-op-script text-[17px] leading-[1.55] text-[#2A2230] lg:text-[18px]">
-                      {question.questionEn}
-                    </p>
                   </div>
+
+                  <p className="m-0 whitespace-pre-line font-op-script text-[17px] leading-[1.6] text-[#2A2230] lg:text-[18px]">
+                    {question.questionEn}
+                  </p>
+
                   {player.supported && (
                     <button
                       type="button"
-                      onClick={() => player.playFrom(QUESTION_INDEX)}
-                      className="h-10 flex-none rounded-full bg-op-eva px-3.5 text-[13px] font-semibold text-white"
+                      onClick={player.playQuestion}
+                      className="flex h-10 items-center justify-center gap-2 self-start rounded-full bg-op-eva px-4 text-[13px] font-semibold text-white"
                     >
-                      질문 듣기
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                        <path d="M8 5.5v13a1 1 0 0 0 1.5.9l10-6.5a1 1 0 0 0 0-1.8l-10-6.5A1 1 0 0 0 8 5.5z" />
+                      </svg>
+                      질문 듣기 (여성)
                     </button>
                   )}
                 </section>
@@ -248,7 +254,7 @@ function OpicScriptContent() {
                 patterns={patterns}
                 size={size}
                 activeLine={player.index !== null && player.index >= 0 ? player.index : null}
-                onLineClick={(line) => player.playFrom(line)}
+                onLineClick={(line) => player.playAnswer(line)}
               />
 
               <OpicPlayer
@@ -265,6 +271,7 @@ function OpicScriptContent() {
                 maleVoice={player.maleVoice}
                 femaleVoice={player.femaleVoice}
                 onVoice={player.setVoiceName}
+                onRefreshVoices={player.refreshVoices}
               />
 
               {question.sharedQuestion && (

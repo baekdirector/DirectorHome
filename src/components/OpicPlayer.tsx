@@ -19,6 +19,7 @@ export function OpicPlayer({
   maleVoice,
   femaleVoice,
   onVoice,
+  onRefreshVoices,
 }: {
   supported: boolean
   playing: boolean
@@ -34,6 +35,7 @@ export function OpicPlayer({
   maleVoice: SpeechSynthesisVoice | null
   femaleVoice: SpeechSynthesisVoice | null
   onVoice: (gender: 'male' | 'female', name: string) => void
+  onRefreshVoices: () => void
 }) {
   const [showVoices, setShowVoices] = useState(false)
 
@@ -48,6 +50,7 @@ export function OpicPlayer({
   return (
     <div className="flex flex-col gap-2 rounded-2xl border border-op-border bg-white p-3">
       <div className="flex items-center gap-2">
+        <span className="flex-none text-[12px] font-semibold text-op-ink-muted">답변</span>
         <button
           type="button"
           onClick={onPrev}
@@ -121,34 +124,61 @@ export function OpicPlayer({
       </div>
 
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1 px-1 text-[12px] text-op-ink-muted">
-        <span>질문 {femaleVoice?.name ?? '(없음)'}</span>
-        <span>답변 {maleVoice?.name ?? '(없음)'}</span>
-        <button type="button" onClick={() => setShowVoices((v) => !v)} className="font-semibold text-op-accent">
+        <span>답변 음성 {maleVoice?.name ?? '기기 기본'}</span>
+        <button
+          type="button"
+          onClick={() => {
+            onRefreshVoices()
+            setShowVoices((v) => !v)
+          }}
+          className="font-semibold text-op-accent"
+        >
           {showVoices ? '닫기' : '목소리 바꾸기'}
         </button>
       </div>
 
       {showVoices && (
         <div className="flex flex-col gap-2 rounded-xl bg-op-bg p-3">
-          {(['female', 'male'] as const).map((g) => (
-            <label key={g} className="flex items-center gap-2 text-[13px]">
-              <span className="w-16 flex-none text-op-ink-muted">{g === 'female' ? '질문' : '답변'}</span>
-              <select
-                value={(g === 'female' ? femaleVoice?.name : maleVoice?.name) ?? ''}
-                onChange={(e) => onVoice(g, e.target.value)}
-                className="min-w-0 flex-1 rounded-lg border border-op-border bg-white px-2 py-1.5 text-[13px]"
+          {voices.length === 0 ? (
+            <>
+              <p className="m-0 text-[12px] leading-relaxed text-op-ink-muted">
+                이 기기에서 고를 수 있는 음성 목록을 아직 받지 못했어요. 안드로이드는 한 번 읽어본
+                뒤에야 목록이 채워지기도 합니다. <b className="text-op-ink">재생을 한 번 눌러 본 뒤</b>{' '}
+                다시 열어 보세요.
+              </p>
+              <button
+                type="button"
+                onClick={onRefreshVoices}
+                className="self-start rounded-lg border border-op-border bg-white px-3 py-1.5 text-[12px] font-semibold text-op-ink"
               >
-                {voices.map((v) => (
-                  <option key={v.name} value={v.name}>
-                    {v.name} ({v.lang})
-                  </option>
-                ))}
-              </select>
-            </label>
-          ))}
-          <p className="m-0 text-[11px] text-op-ink-muted">
-            기기에 실린 목소리만 고를 수 있어요. 남성·여성 구분이 어긋나면 여기서 바꾸세요.
-          </p>
+                목록 다시 찾기
+              </button>
+            </>
+          ) : (
+            <>
+              {(['female', 'male'] as const).map((g) => (
+                <label key={g} className="flex items-center gap-2 text-[13px]">
+                  <span className="w-20 flex-none text-op-ink-muted">
+                    {g === 'female' ? '질문(여)' : '답변(남)'}
+                  </span>
+                  <select
+                    value={(g === 'female' ? femaleVoice?.name : maleVoice?.name) ?? ''}
+                    onChange={(e) => onVoice(g, e.target.value)}
+                    className="min-w-0 flex-1 rounded-lg border border-op-border bg-white px-2 py-1.5 text-[13px]"
+                  >
+                    {voices.map((v) => (
+                      <option key={v.name} value={v.name}>
+                        {v.name} ({v.lang})
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              ))}
+              <p className="m-0 text-[11px] text-op-ink-muted">
+                기기에 실린 목소리만 고를 수 있어요. 남성·여성 구분이 어긋나면 여기서 바꾸세요.
+              </p>
+            </>
+          )}
         </div>
       )}
     </div>

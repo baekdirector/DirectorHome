@@ -51,11 +51,18 @@ export function pickVoice<T extends VoiceLike>(voices: T[], gender: VoiceGender)
 export const isSpeechSupported = () =>
   typeof window !== 'undefined' && 'speechSynthesis' in window && 'SpeechSynthesisUtterance' in window
 
+/** 지금 당장 알 수 있는 음성 목록. 아직 안 채워졌으면 빈 배열. */
+export function currentVoices(): SpeechSynthesisVoice[] {
+  return isSpeechSupported() ? window.speechSynthesis.getVoices() : []
+}
+
 /**
- * 음성 목록을 받아온다. 크롬은 첫 호출에서 빈 배열을 주고 조금 뒤 voiceschanged로 채우므로
- * 그 이벤트를 기다린다. 끝내 비어 있으면 빈 배열로 끝낸다(무한정 기다리지 않는다).
+ * 음성 목록을 받아온다.
+ * 크롬은 첫 호출에서 빈 배열을 주고 나중에 voiceschanged로 채우는데, 안드로이드에서는
+ * 그 이벤트가 늦게 오거나 "한 번 읽어본 뒤"에야 채워지기도 한다. 그래서 이벤트만 믿지 않고
+ * 짧은 간격으로 다시 들여다본다. 끝내 비어 있으면 빈 배열로 끝낸다.
  */
-export function loadVoices(timeoutMs = 3000): Promise<SpeechSynthesisVoice[]> {
+export function loadVoices(timeoutMs = 10000): Promise<SpeechSynthesisVoice[]> {
   if (!isSpeechSupported()) return Promise.resolve([])
   const synth = window.speechSynthesis
 
@@ -68,10 +75,14 @@ export function loadVoices(timeoutMs = 3000): Promise<SpeechSynthesisVoice[]> {
       if (done) return
       done = true
       synth.removeEventListener('voiceschanged', onChange)
+      clearInterval(poll)
       clearTimeout(timer)
       resolve(synth.getVoices())
     }
     const onChange = () => finish()
+    const poll = setInterval(() => {
+      if (synth.getVoices().length > 0) finish()
+    }, 300)
     const timer = setTimeout(finish, timeoutMs)
     synth.addEventListener('voiceschanged', onChange)
   })
