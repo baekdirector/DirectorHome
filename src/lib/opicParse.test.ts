@@ -6,6 +6,7 @@ import {
   parseAnnotations,
   parseSheetName,
   parseTitleLine,
+  splitAnswerLines,
   splitQuestionCell,
 } from './opicParse'
 
@@ -182,5 +183,28 @@ describe('findPatterns', () => {
       { topic: 'C', answer: 'Thanks.' },
     ]
     expect(findPatterns(answers)).toEqual([])
+  })
+})
+
+describe('splitAnswerLines', () => {
+  it('줄은 문장으로, 빈 줄은 문단 간격으로 바꾼다', () => {
+    expect(splitAnswerLines('A\nB\n\nC')).toEqual([
+      { kind: 'line', text: 'A' },
+      { kind: 'line', text: 'B' },
+      { kind: 'gap' },
+      { kind: 'line', text: 'C' },
+    ])
+  })
+
+  it('빈 줄이 여러 개 이어져도 간격은 하나로 합친다', () => {
+    expect(splitAnswerLines('A\n\n\n\nB')).toEqual([
+      { kind: 'line', text: 'A' },
+      { kind: 'gap' },
+      { kind: 'line', text: 'B' },
+    ])
+  })
+
+  it('앞뒤의 빈 줄은 버린다', () => {
+    expect(splitAnswerLines('\n\nA\n\n')).toEqual([{ kind: 'line', text: 'A' }])
   })
 })

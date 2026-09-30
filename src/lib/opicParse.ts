@@ -104,6 +104,23 @@ export function parseAnnotations(line: string): AnnotationPart[] {
   return parts
 }
 
+export type AnswerBlock = { kind: 'line'; text: string } | { kind: 'gap' }
+
+/** 답변 전문을 문장 줄과 문단 간격으로 나눈다. 연속된 빈 줄은 간격 하나로 합친다. */
+export function splitAnswerLines(answer: string): AnswerBlock[] {
+  const out: AnswerBlock[] = []
+  for (const raw of (answer ?? '').split('\n')) {
+    const t = raw.trim()
+    if (t === '') {
+      if (out.length > 0 && out[out.length - 1].kind === 'line') out.push({ kind: 'gap' })
+      continue
+    }
+    out.push({ kind: 'line', text: t })
+  }
+  while (out.length > 0 && out[out.length - 1].kind === 'gap') out.pop()
+  return out
+}
+
 /** 공백 차이를 무시하는 FNV-1a 해시. 브라우저·Node 양쪽에서 같은 값을 준다. */
 export function answerHash(answer: string): string {
   const norm = (answer ?? '')
