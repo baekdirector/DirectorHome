@@ -28,14 +28,27 @@ function OpicTopicContent() {
   return (
     <div className="flex min-h-svh flex-col bg-op-bg font-hh-sans text-op-ink lg:flex-row">
       <OpicNav />
+
+      {/* 넓은 화면은 스크립트 뷰어와 같은 3단을 쓴다. 문항을 고르기 전에는 본문 자리가 빈 상태다. */}
+      {topic && questions && (
+        <aside className="hidden w-[330px] flex-none border-r border-op-border bg-op-surface px-4 py-6 lg:block lg:h-svh lg:overflow-y-auto">
+          <OpicQuestionList topic={topic} questions={questions} />
+        </aside>
+      )}
+
       <main className="min-w-0 flex-1 px-5 pb-12 pt-3 lg:px-10 lg:pt-7">
         {failed && <LoadError screen={false} message="문항을 불러오지 못했어요." onRetry={reload} />}
         {notFound && <OpicNotFound what="주제" />}
         {!failed && !notFound && !topic && <Loading />}
         {topic && questions && (
-          <div className="lg:max-w-[760px]">
-            <OpicQuestionList topic={topic} questions={questions} />
-          </div>
+          <>
+            <div className="lg:hidden">
+              <OpicQuestionList topic={topic} questions={questions} />
+            </div>
+            <div className="hidden h-full items-center justify-center lg:flex">
+              <p className="m-0 text-[15px] text-op-ink-muted">왼쪽에서 문항을 고르세요.</p>
+            </div>
+          </>
         )}
       </main>
     </div>
