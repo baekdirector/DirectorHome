@@ -137,7 +137,7 @@ function StatsContent() {
   return (
     <div className="flex min-h-svh flex-col bg-hh-bg font-hh-sans text-hh-ink">
       <HouseholdNav />
-      <div className="flex items-center justify-between px-5 pb-3 pt-1">
+      <div className="mx-auto flex w-full max-w-[900px] items-center justify-between px-5 pb-3 pt-1 lg:px-8 lg:pb-4 lg:pt-6">
         <div className="font-hh-serif text-[24px] font-bold">통계</div>
         <div className="relative">
           <button
@@ -175,8 +175,8 @@ function StatsContent() {
         </div>
       </div>
 
-      <div className="px-5 pb-4">
-        <div className="grid grid-cols-3 gap-1 rounded-[16px] bg-[#EAE3D7] p-1">
+      <div className="mx-auto w-full max-w-[900px] px-5 pb-4 lg:px-8">
+        <div className="grid grid-cols-3 gap-1 rounded-[16px] bg-[#EAE3D7] p-1 lg:max-w-[420px]">
           {(['expense', 'income', 'balance'] as Tab[]).map((t) => (
             <button
               key={t}
@@ -191,7 +191,8 @@ function StatsContent() {
         </div>
       </div>
 
-      <div className="flex flex-col gap-4 px-5 pb-24">
+      {/* 차트가 대부분이라 2단으로 나누면 빈칸이 생긴다. 한 단을 유지하되 폭만 제한한다. */}
+      <div className="mx-auto flex w-full max-w-[900px] flex-col gap-4 px-5 pb-24 lg:gap-5 lg:px-8 lg:pb-12">
         {tab === 'expense' && (
           <>
             <div className="flex flex-col gap-4 rounded-[24px] bg-white p-5">

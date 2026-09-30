@@ -314,13 +314,13 @@ function HouseholdContent() {
       <HouseholdNav />
 
       {/* 월 전환 */}
-      <div className="flex items-center justify-between px-3 pb-3 pt-1">
+      <div className="mx-auto flex w-full max-w-[1180px] items-center justify-between px-3 pb-3 pt-1 lg:justify-start lg:gap-2 lg:px-8 lg:pb-5 lg:pt-6">
         <button type="button" aria-label="이전 달" onClick={() => goMonth(-1)} className="flex h-11 w-11 items-center justify-center rounded-full">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#1E2B27" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <path d="m15 6-6 6 6 6" />
           </svg>
         </button>
-        <button type="button" onClick={() => setPickerOpen(true)} className="relative flex flex-col items-center gap-0.5">
+        <button type="button" onClick={() => setPickerOpen(true)} className="relative flex flex-col items-center gap-0.5 lg:order-first lg:flex-row lg:items-baseline lg:gap-2">
           <span className="text-[12px] text-hh-ink-muted">{year}</span>
           <span className="font-hh-serif text-[24px] font-bold">{month}월</span>
           {pickerOpen && (
@@ -334,9 +334,9 @@ function HouseholdContent() {
         </button>
       </div>
 
-      <div className="flex flex-col gap-4 px-5 pb-24">
+      <div className="mx-auto flex w-full max-w-[1180px] flex-col gap-4 px-5 pb-24 lg:grid lg:grid-cols-2 lg:items-start lg:gap-5 lg:px-8 lg:pb-12">
         {/* 히어로 */}
-        <div className="flex flex-col gap-[18px] rounded-[28px] bg-hh-pine p-6 text-white shadow-[0_18px_40px_-24px_rgba(34,67,59,0.7)]">
+        <div className="flex flex-col gap-[18px] rounded-[28px] bg-hh-pine p-6 text-white shadow-[0_18px_40px_-24px_rgba(34,67,59,0.7)] lg:h-full lg:justify-between">
           <div className="flex items-center justify-between">
             <div className="text-[14px] text-[#CFDDD5]">이번 달 남은 돈</div>
             <div className="text-[12px] text-[#CFDDD5]">전달 이월 {formatWon(carriedIn)}원</div>
@@ -393,14 +393,14 @@ function HouseholdContent() {
                 통계 보기
               </Link>
             </div>
-            <div className="flex items-center gap-5">
+            <div className="flex items-center gap-5 lg:gap-8">
               <div
-                className="flex h-[124px] w-[124px] flex-none items-center justify-center rounded-full"
+                className="flex h-[124px] w-[124px] flex-none items-center justify-center rounded-full lg:h-[150px] lg:w-[150px]"
                 style={{ background: donutGroups.donutBg }}
               >
-                <div className="flex h-[84px] w-[84px] flex-col items-center justify-center rounded-full bg-white">
-                  <div className="text-[11px] text-hh-ink-muted">총 지출</div>
-                  <div className="text-[14px] font-bold">{(expenseTotal / 10000).toFixed(0)}만</div>
+                <div className="flex h-[84px] w-[84px] flex-col items-center justify-center rounded-full bg-white lg:h-[102px] lg:w-[102px]">
+                  <div className="text-[11px] text-hh-ink-muted lg:text-[12px]">총 지출</div>
+                  <div className="text-[14px] font-bold lg:text-[17px]">{(expenseTotal / 10000).toFixed(0)}만</div>
                 </div>
               </div>
               <div className="flex flex-1 flex-col gap-3">
@@ -472,7 +472,7 @@ function HouseholdContent() {
         )}
 
         {/* 입력 내역 */}
-        <div className="flex items-center justify-between pt-1">
+        <div className="flex items-center justify-between pt-1 lg:col-span-2 lg:pt-3">
           <div className="font-hh-serif text-[18px] font-bold">{month}월 입력 내역</div>
           <button
             type="button"
@@ -482,8 +482,11 @@ function HouseholdContent() {
             PDF 가져오기
           </button>
         </div>
+        {/* 그룹 카드는 길이가 제각각이라 그리드로 놓으면 행 높이에 묶여 빈칸이 생긴다.
+            넓은 화면에서는 다단으로 흘려 빈틈 없이 채운다. */}
+        <div className="flex flex-col gap-4 lg:col-span-2 lg:block lg:columns-2 lg:gap-5">
         {sections.map((s) => (
-          <div key={s.group} className="flex flex-col rounded-[24px] bg-white px-2 pb-1.5 pt-1">
+          <div key={s.group} className="flex flex-col rounded-[24px] bg-white px-2 pb-1.5 pt-1 lg:mb-5 lg:break-inside-avoid">
             <div className="flex items-center justify-between px-3 py-2.5">
               <div className="flex items-center gap-2">
                 <div className="h-2 w-2 rounded-full" style={{ background: s.color }} />
@@ -524,6 +527,7 @@ function HouseholdContent() {
             )}
           </div>
         ))}
+        </div>
       </div>
 
       <HouseholdBottomNav />
