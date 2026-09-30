@@ -14,6 +14,9 @@ import {
 const SKIP_SHEETS = new Set(['서베이'])
 const ROLEPLAY_SHEETS = new Set(['Roleplay', 'Roleplay1'])
 
+/** 시트명 오타는 화면에 보일 주제명에서 바로잡는다. 원본 오타는 DB에 남기지 않는다. */
+const NAME_FIXES = new Map([['Heath', 'Health']])
+
 /** exceljs 셀 값은 문자열·숫자·리치텍스트·수식 결과 등 여러 모양이라 문자열로 눌러준다. */
 function cellText(v) {
   if (v == null) return ''
@@ -43,7 +46,9 @@ export async function buildImport(filePath) {
       return
     }
 
-    const { name, stars } = parseSheetName(sheetName)
+    const parsedSheet = parseSheetName(sheetName)
+    const name = NAME_FIXES.get(parsedSheet.name) ?? parsedSheet.name
+    const stars = parsedSheet.stars
     const kind = ROLEPLAY_SHEETS.has(sheetName) ? 'roleplay' : 'topic'
     let curSet = null
     let seq = 0
@@ -131,6 +136,19 @@ export async function buildImport(filePath) {
     }
   })
 
+  // 같은 영어 질문이 서로 다른 주제에 들어가 있으면 시트 간 복사 실수다
+  // (Hotel★★에 Bank 질문이 들어간 경우). 화면에서 고칠 수 있게 표시만 남긴다.
+  const topicsOfQuestion = new Map()
+  for (const q of questions) {
+    if (q.questionEn.trim() === '') continue
+    const set = topicsOfQuestion.get(q.questionEn) ?? new Set()
+    set.add(q.sheetName)
+    topicsOfQuestion.set(q.questionEn, set)
+  }
+  for (const q of questions) {
+    q.sharedQuestion = (topicsOfQuestion.get(q.questionEn)?.size ?? 0) > 1
+  }
+
   const patterns = findPatterns(questions.map((q) => ({ topic: q.sheetName, answer: q.answerEn })))
   return { topics, questions, patterns, issues }
 }
@@ -148,6 +166,10 @@ function report({ topics, questions, patterns, issues }) {
   for (const it of issues) {
     console.log(`  [${it.sheet}] r${it.row} ${it.why}${it.sample ? ' | ' + it.sample : ''}`)
   }
+  const review = questions.filter((q) => q.sharedQuestion)
+  console.log('')
+  console.log(`-- 검수 표시(같은 영어 질문이 다른 주제에도 있음) ${review.length}건 --`)
+  for (const q of review) console.log(`  ${q.sourceRef.padEnd(18)} ${q.titleKo.slice(0, 40)}`)
   console.log('')
   console.log('-- 주제 목록 --')
   for (const t of topics) {

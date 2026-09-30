@@ -115,6 +115,53 @@ export async function migrate() {
 
     -- 기존 DB에 남아있던 "카테고리당 월 하나" UNIQUE 제약을 제거한다(품목별 다중 입력을 허용하기 위해).
     ALTER TABLE expense_entries DROP CONSTRAINT IF EXISTS expense_entries_category_id_year_month_key;
+
+    -- OPIC 스크립트 암기장. 원본은 사용자가 관리하는 엑셀이고 여기는 그 사본이다.
+    -- 임포트가 지우고 다시 넣는 방식이라 시트명을 대조용으로 들고 있을 필요가 없다.
+    CREATE TABLE IF NOT EXISTS opic_topics (
+      id SERIAL PRIMARY KEY,
+      name TEXT NOT NULL,
+      stars INTEGER NOT NULL DEFAULT 0,
+      kind TEXT NOT NULL CHECK (kind IN ('topic', 'roleplay')),
+      display_order INTEGER NOT NULL DEFAULT 0,
+      created_at BIGINT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS opic_questions (
+      id SERIAL PRIMARY KEY,
+      topic_id INTEGER NOT NULL REFERENCES opic_topics(id) ON DELETE CASCADE,
+      set_label TEXT,
+      seq INTEGER NOT NULL,
+      level TEXT,
+      title_ko TEXT NOT NULL,
+      alt_titles TEXT[] NOT NULL DEFAULT '{}',
+      importance INTEGER NOT NULL DEFAULT 0,
+      question_en TEXT NOT NULL DEFAULT '',
+      answer_en TEXT NOT NULL,
+      -- 엑셀에서 고칠 때 찾아갈 좌표. 'Hotel★★!C2' 형태.
+      source_ref TEXT NOT NULL,
+      -- 같은 영어 질문이 다른 주제에도 있는 경우. 시트 간 복사 실수를 찾는 실마리다.
+      shared_question BOOLEAN NOT NULL DEFAULT FALSE,
+      answer_hash TEXT NOT NULL,
+      created_at BIGINT NOT NULL
+    );
+
+    -- 암기 상태는 문항 id가 아니라 답변 본문 해시에 붙인다. 본문이 같은 문항이 63종 있어
+    -- 상태를 공유해야 하고, 엑셀을 고쳐 재임포트해도 id와 무관하게 남는다.
+    CREATE TABLE IF NOT EXISTS opic_status (
+      answer_hash TEXT PRIMARY KEY,
+      state TEXT NOT NULL CHECK (state IN ('weak', 'ok', 'done')),
+      updated_at BIGINT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS opic_patterns (
+      text TEXT PRIMARY KEY,
+      topic_count INTEGER NOT NULL,
+      occurrences INTEGER NOT NULL
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_opic_questions_topic ON opic_questions(topic_id, seq);
+    CREATE INDEX IF NOT EXISTS idx_opic_questions_hash ON opic_questions(answer_hash);
   `)
 
   // 오답 노트 기능 이전의 틀린 기록으로 노트를 채운다. 이미 노트에 있는 단어는 건드리지 않는다.
