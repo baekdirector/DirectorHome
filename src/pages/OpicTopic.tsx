@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { AccessGate } from '../components/AccessGate'
 import { OpicNav } from '../components/OpicNav'
@@ -76,8 +76,11 @@ export function useTopicData(id: number) {
   const [questions, setQuestions] = useState<OpicQuestionSummary[] | null>(null)
   const [failed, setFailed] = useState(false)
   const [notFound, setNotFound] = useState(false)
+  // 주제를 빠르게 바꾸면 응답이 순서를 어겨 도착할 수 있다. 마지막 요청만 반영한다.
+  const requestIdRef = useRef(0)
 
   const reload = async () => {
+    const requestId = ++requestIdRef.current
     setFailed(false)
     setNotFound(false)
     if (!Number.isFinite(id)) {
@@ -86,6 +89,7 @@ export function useTopicData(id: number) {
     }
     try {
       const [topics, qs] = await Promise.all([getTopics(), getTopicQuestions(id)])
+      if (requestIdRef.current !== requestId) return
       const found = topics.find((t) => t.id === id)
       if (!found) {
         setNotFound(true)
@@ -94,6 +98,7 @@ export function useTopicData(id: number) {
       setTopic(found)
       setQuestions(qs)
     } catch {
+      if (requestIdRef.current !== requestId) return
       setFailed(true)
     }
   }

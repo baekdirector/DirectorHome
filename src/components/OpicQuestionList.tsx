@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { OpicProgressBar } from './OpicProgressBar'
 import { OpicStatusChip } from './OpicStatusChip'
@@ -26,7 +26,9 @@ export function OpicQuestionList({
     return seen
   }, [questions])
 
+  // 주제가 바뀌면 이전 주제의 세트 선택이 남아 목록이 비어 보일 수 있다.
   const [set, setSet] = useState<string>('전체')
+  useEffect(() => setSet('전체'), [topic.id])
   const shown = set === '전체' ? questions : questions.filter((q) => (q.setLabel ?? '기타') === set)
 
   return (

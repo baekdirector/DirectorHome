@@ -170,6 +170,12 @@ function report({ topics, questions, patterns, issues }) {
   console.log('')
   console.log(`-- 검수 표시(같은 영어 질문이 다른 주제에도 있음) ${review.length}건 --`)
   for (const q of review) console.log(`  ${q.sourceRef.padEnd(18)} ${q.titleKo.slice(0, 40)}`)
+  // 세트 라벨은 A열 값을 그대로 물려받으므로, 엑셀에 메모를 적어두면 가짜 세트 탭이 생긴다.
+  // 검수 단계에서 눈으로 걸러낼 수 있도록 실제로 잡힌 라벨을 모두 보여준다.
+  const labels = [...new Set(questions.map((q) => q.setLabel ?? '(없음)'))].sort()
+  console.log('')
+  console.log(`-- 잡힌 세트 라벨 ${labels.length}종 (낯선 값이 있으면 A열을 확인) --`)
+  console.log('  ' + labels.map((l) => JSON.stringify(l)).join(', '))
   console.log('')
   console.log('-- 주제 목록 --')
   for (const t of topics) {

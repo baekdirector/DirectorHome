@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { AccessGate } from '../components/AccessGate'
 import { OpicNav } from '../components/OpicNav'
@@ -34,23 +34,45 @@ function OpicScriptContent() {
   const qid = Number(questionId)
   const navigate = useNavigate()
 
-  const { topic, questions } = useTopicData(tid)
+  const { topic, questions, reload: reloadTopic } = useTopicData(tid)
   const [question, setQuestion] = useState<OpicQuestion | null>(null)
   const [patterns, setPatterns] = useState<Set<string>>(new Set())
   const [failed, setFailed] = useState(false)
   const [notFound, setNotFound] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
-  const [size, setSize] = useState<FontSize>(
-    () => (localStorage.getItem(FONT_KEY) as FontSize | null) ?? 'md',
-  )
+  const [size, setSize] = useState<FontSize>(() => {
+    const saved = localStorage.getItem(FONT_KEY)
+    return SIZES.includes(saved as FontSize) ? (saved as FontSize) : 'md'
+  })
+  // 문항을 빠르게 넘기면 응답이 순서를 어겨 도착할 수 있다. 마지막 요청만 화면에 반영한다.
+  const requestIdRef = useRef(0)
 
   const load = async () => {
+    const requestId = ++requestIdRef.current
     setFailed(false)
     setNotFound(false)
+    // 새 문항을 불러오는 동안 이전 문항을 남겨두면 잘못된 문항에 상태를 저장하게 된다.
+    setQuestion(null)
+
     try {
-      setQuestion(await getQuestion(qid))
-    } catch {
-      setNotFound(true)
+      const q = await getQuestion(qid)
+      if (requestIdRef.current !== requestId) return
+      setQuestion(q)
+    } catch (e) {
+      if (requestIdRef.current !== requestId) return
+      // 없는 문항과 통신 실패는 사용자가 할 수 있는 일이 다르다.
+      if (e instanceof Error && e.message.includes('404')) setNotFound(true)
+      else setFailed(true)
+    }
+
+    // 만능 패턴은 밑줄을 위한 부가 정보다. 못 받아도 본문 읽기를 막지 않는다.
+    if (patterns.size === 0) {
+      try {
+        const list = await getPatterns()
+        if (requestIdRef.current === requestId) setPatterns(new Set(list))
+      } catch {
+        /* 밑줄만 빠진다 */
+      }
     }
   }
 
@@ -59,28 +81,26 @@ function OpicScriptContent() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [qid])
 
-  useEffect(() => {
-    getPatterns()
-      .then((list) => setPatterns(new Set(list)))
-      .catch(() => setFailed(true))
-  }, [])
-
   const pickSize = (s: FontSize) => {
     setSize(s)
     localStorage.setItem(FONT_KEY, s)
   }
 
-  // 같은 칸을 다시 누르면 미설정으로 되돌린다. 저장에 실패하면 이전 값으로 돌려놓는다.
+  // 같은 칸을 다시 누르면 미설정으로 되돌린다.
+  // 저장 중에 문항이 바뀔 수 있으므로 되돌릴 때도 "그 문항이 아직 화면에 있을 때만" 손댄다.
   const pickState = async (nextState: OpicState) => {
     if (!question) return
-    const before = question.state
+    const target = question
+    const before = target.state
     const value = before === nextState ? null : nextState
-    setQuestion({ ...question, state: value })
+    setQuestion((cur) => (cur && cur.id === target.id ? { ...cur, state: value } : cur))
     setSaveError(null)
     try {
-      await putStatus(question.answerHash, value)
+      await putStatus(target.answerHash, value)
+      // 같은 답변을 쓰는 다른 문항까지 상태가 바뀌므로 목록과 진도를 다시 받는다.
+      reloadTopic()
     } catch {
-      setQuestion({ ...question, state: before })
+      setQuestion((cur) => (cur && cur.id === target.id ? { ...cur, state: before } : cur))
       setSaveError('상태를 저장하지 못했어요. 다시 눌러 주세요.')
     }
   }
@@ -114,8 +134,13 @@ function OpicScriptContent() {
           {failed && <LoadError screen={false} message="스크립트를 불러오지 못했어요." onRetry={load} />}
           {!notFound && !failed && !question && <Loading />}
 
-          {question && (
+          {question && !notFound && !failed && (
             <div className="flex flex-col gap-4">
+              {/* 롤플레이 조각은 에바 카드가 없어 제목이 사라지므로 따로 보여준다. */}
+              {question.questionEn.trim() === '' && (
+                <h1 className="m-0 text-[17px] font-semibold">{question.titleKo}</h1>
+              )}
+
               {/* 에바 질문 카드. 롤플레이처럼 영어 질문이 없는 문항에는 그리지 않는다. */}
               {question.questionEn.trim() !== '' && (
                 <section className="flex gap-4 rounded-2xl border border-[#E8C9DA] bg-op-eva-tint p-4 lg:p-5">
