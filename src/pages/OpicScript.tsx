@@ -6,7 +6,10 @@ import { OpicQuestionList } from '../components/OpicQuestionList'
 import { OpicScriptBody, type FontSize } from '../components/OpicScriptBody'
 import { Loading } from '../components/Loading'
 import { LoadError } from '../components/LoadError'
+import { OpicPlayer } from '../components/OpicPlayer'
 import { OpicNotFound, useTopicData } from './OpicTopic'
+import { splitAnswerLines } from '../lib/opicParse'
+import { QUESTION_INDEX, useOpicPlayer } from '../lib/useOpicPlayer'
 import {
   getPatterns,
   getQuestion,
@@ -86,13 +89,12 @@ function OpicScriptContent() {
     localStorage.setItem(FONT_KEY, s)
   }
 
-  // 같은 칸을 다시 누르면 미설정으로 되돌린다.
   // 저장 중에 문항이 바뀔 수 있으므로 되돌릴 때도 "그 문항이 아직 화면에 있을 때만" 손댄다.
-  const pickState = async (nextState: OpicState) => {
+  const pickState = async (value: OpicState | null) => {
     if (!question) return
     const target = question
     const before = target.state
-    const value = before === nextState ? null : nextState
+    if (before === value) return
     setQuestion((cur) => (cur && cur.id === target.id ? { ...cur, state: value } : cur))
     setSaveError(null)
     try {
@@ -108,6 +110,26 @@ function OpicScriptContent() {
   const idx = questions?.findIndex((q) => q.id === qid) ?? -1
   const prev = idx > 0 ? questions?.[idx - 1] : undefined
   const next = idx >= 0 && questions ? questions[idx + 1] : undefined
+
+  // 재생기는 화면에 보이는 줄과 같은 배열을 읽어야 하이라이트 위치가 맞는다.
+  const lines = question
+    ? splitAnswerLines(question.answerEn)
+        .filter((b) => b.kind === 'line')
+        .map((b) => (b as { kind: 'line'; text: string }).text)
+    : []
+  const player = useOpicPlayer({ question: question?.questionEn ?? '', lines })
+
+  // 문항이 바뀌면 이전 문항을 읽던 소리를 끊는다.
+  useEffect(() => {
+    player.stop()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [qid])
+
+  const stepBy = (delta: number) => {
+    const from = player.index ?? QUESTION_INDEX
+    const target = Math.max(QUESTION_INDEX, Math.min(lines.length - 1, from + delta))
+    player.playFrom(target)
+  }
 
   return (
     <div className="flex min-h-svh flex-col bg-op-bg font-hh-sans text-op-ink lg:flex-row">
@@ -143,7 +165,11 @@ function OpicScriptContent() {
 
               {/* 에바 질문 카드. 롤플레이처럼 영어 질문이 없는 문항에는 그리지 않는다. */}
               {question.questionEn.trim() !== '' && (
-                <section className="flex gap-4 rounded-2xl border border-[#E8C9DA] bg-op-eva-tint p-4 lg:p-5">
+                <section
+                  className={`flex gap-4 rounded-2xl border bg-op-eva-tint p-4 lg:p-5 ${
+                    player.index === QUESTION_INDEX ? 'border-op-eva ring-2 ring-op-eva/30' : 'border-[#E8C9DA]'
+                  }`}
+                >
                   <span className="flex h-10 w-10 flex-none items-center justify-center rounded-full bg-op-eva text-[13px] font-bold text-white">
                     Eva
                   </span>
@@ -156,28 +182,37 @@ function OpicScriptContent() {
                         </span>
                       ))}
                     </div>
-                    <p className="m-0 whitespace-pre-line font-op-serif text-[17px] leading-[1.55] text-[#2A2230] lg:text-[18px]">
+                    <p className="m-0 whitespace-pre-line font-op-script text-[17px] leading-[1.55] text-[#2A2230] lg:text-[18px]">
                       {question.questionEn}
                     </p>
                   </div>
+                  {player.supported && (
+                    <button
+                      type="button"
+                      onClick={() => player.playFrom(QUESTION_INDEX)}
+                      className="h-10 flex-none rounded-full bg-op-eva px-3.5 text-[13px] font-semibold text-white"
+                    >
+                      질문 듣기
+                    </button>
+                  )}
                 </section>
               )}
 
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div className="flex gap-1 rounded-xl bg-[#ECE8DF] p-1">
-                  {OPIC_STATES.map((s) => (
+                  {([null, ...OPIC_STATES] as (OpicState | null)[]).map((s) => (
                     <button
-                      key={s}
+                      key={s ?? 'none'}
                       type="button"
                       onClick={() => pickState(s)}
                       aria-pressed={question.state === s}
-                      className={`h-9 rounded-lg px-3.5 text-[14px] ${
+                      className={`h-9 rounded-lg px-3 text-[14px] ${
                         question.state === s
                           ? 'bg-white font-bold text-op-ink shadow-[0_1px_3px_rgba(31,42,39,0.12)]'
                           : 'text-op-ink-muted'
                       }`}
                     >
-                      {OPIC_STATE_LABEL[s]}
+                      {s ? OPIC_STATE_LABEL[s] : '미설정'}
                     </button>
                   ))}
                 </div>
@@ -208,7 +243,29 @@ function OpicScriptContent() {
                 </p>
               )}
 
-              <OpicScriptBody answer={question.answerEn} patterns={patterns} size={size} />
+              <OpicScriptBody
+                answer={question.answerEn}
+                patterns={patterns}
+                size={size}
+                activeLine={player.index !== null && player.index >= 0 ? player.index : null}
+                onLineClick={(line) => player.playFrom(line)}
+              />
+
+              <OpicPlayer
+                supported={player.supported}
+                playing={player.playing}
+                position={player.index === null ? 0 : player.index + 1}
+                total={lines.length}
+                rate={player.rate}
+                onToggle={player.toggle}
+                onPrev={() => stepBy(-1)}
+                onNext={() => stepBy(1)}
+                onRate={player.setRate}
+                voices={player.voices}
+                maleVoice={player.maleVoice}
+                femaleVoice={player.femaleVoice}
+                onVoice={player.setVoiceName}
+              />
 
               {question.sharedQuestion && (
                 <p className="m-0 text-[12px] text-op-ink-muted">

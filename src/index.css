@@ -62,7 +62,8 @@
   --color-op-done: #15803D;
   --color-op-ok: #D69E2E;
   --color-op-weak: #E0662B;
-  --font-op-serif: 'Source Serif 4', Georgia, serif;
+  /* 스크립트 본문용. 영문은 IBM Plex Sans, 한글은 이미 쓰는 IBM Plex Sans KR로 이어진다. */
+  --font-op-script: 'IBM Plex Sans', 'IBM Plex Sans KR', system-ui, sans-serif;
 
   --color-hh-up: #A5522B;
   --color-hh-up-tint: #F7E6DC;

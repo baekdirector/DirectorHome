@@ -16,25 +16,39 @@ export function OpicScriptBody({
   answer,
   patterns,
   size = 'md',
+  activeLine,
+  onLineClick,
 }: {
   answer: string
   patterns: Set<string>
   size?: FontSize
+  /** 지금 읽고 있는 문장의 번호(줄 배열 기준). 없으면 null. */
+  activeLine?: number | null
+  /** 문장을 누르면 거기서부터 읽는다. */
+  onLineClick?: (lineIndex: number) => void
 }) {
   const blocks = splitAnswerLines(answer)
+  let lineNo = -1
 
   return (
     <div
-      className={`rounded-2xl border border-op-border bg-white px-4 py-4 font-op-serif leading-[1.75] ${SIZE[size]}`}
+      className={`rounded-2xl border border-op-border bg-white px-4 py-4 font-op-script leading-[1.75] ${SIZE[size]}`}
     >
-      {blocks.map((b, i) =>
-        b.kind === 'gap' ? (
-          <div key={i} className="h-4" />
-        ) : (
+      {blocks.map((b, i) => {
+        if (b.kind === 'gap') return <div key={i} className="h-4" />
+        lineNo += 1
+        const at = lineNo
+        const active = activeLine === at
+        return (
           <p
             key={i}
-            className={`m-0 px-3 py-0.5 ${
-              patterns.has(b.text) ? 'rounded-md border-b-2 border-op-accent bg-op-accent-tint' : ''
+            onClick={onLineClick ? () => onLineClick(at) : undefined}
+            className={`m-0 px-3 py-0.5 ${onLineClick ? 'cursor-pointer' : ''} ${
+              active
+                ? 'rounded-md bg-[#FFF1B8] ring-2 ring-[#E8C64A]'
+                : patterns.has(b.text)
+                  ? 'rounded-md border-b-2 border-op-accent bg-op-accent-tint'
+                  : ''
             }`}
           >
             {parseAnnotations(b.text).map((part, j) => {
@@ -63,8 +77,8 @@ export function OpicScriptBody({
               )
             })}
           </p>
-        ),
-      )}
+        )
+      })}
     </div>
   )
 }
