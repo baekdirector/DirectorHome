@@ -104,7 +104,7 @@ function StatsContent() {
 
   if (loadFailed) {
     return (
-      <div className="flex min-h-svh flex-col bg-hh-bg">
+      <div className="flex min-h-svh flex-col bg-hh-bg lg:flex-row">
         <HouseholdNav />
         <div className="flex-1">
           <LoadError screen={false} message="통계를 불러오지 못했어요." onRetry={load} />
@@ -115,7 +115,7 @@ function StatsContent() {
 
   if (!categories || !entries || !months) {
     return (
-      <div className="flex min-h-svh flex-col bg-hh-bg">
+      <div className="flex min-h-svh flex-col bg-hh-bg lg:flex-row">
         <HouseholdNav />
         <Loading />
       </div>
@@ -135,15 +135,16 @@ function StatsContent() {
   const barScale = 150 / Math.max(maxSpend, 1)
 
   return (
-    <div className="flex min-h-svh flex-col bg-hh-bg font-hh-sans text-hh-ink">
+    <div className="flex min-h-svh flex-col bg-hh-bg font-hh-sans text-hh-ink lg:flex-row">
       <HouseholdNav />
-      <div className="mx-auto flex w-full max-w-[900px] items-center justify-between px-5 pb-3 pt-1 lg:px-8 lg:pb-4 lg:pt-6">
-        <div className="font-hh-serif text-[24px] font-bold">통계</div>
-        <div className="relative">
+      <main className="flex min-w-0 flex-1 flex-col lg:gap-5 lg:px-10 lg:pb-10 lg:pt-7">
+      <div className="flex flex-wrap items-center gap-x-7 px-5 pb-3 pt-1 lg:px-0 lg:pb-0 lg:pt-0">
+        <div className="order-1 font-hh-serif text-[24px] font-bold lg:text-[26px] lg:font-extrabold lg:tracking-tight">통계</div>
+        <div className="relative order-2 ml-auto lg:order-3">
           <button
             type="button"
             onClick={() => setYearPickerOpen((v) => !v)}
-            className="flex h-10 items-center gap-1.5 rounded-full border border-hh-border bg-white px-3.5 text-[14px] font-semibold"
+            className="flex h-10 items-center gap-1.5 rounded-full border border-hh-border bg-white px-3.5 text-[14px] font-semibold lg:h-11 lg:rounded-xl lg:px-4 lg:font-bold"
           >
             {year}년
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#1E2B27" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
@@ -173,44 +174,45 @@ function StatsContent() {
             </>
           )}
         </div>
-      </div>
 
-      <div className="mx-auto w-full max-w-[900px] px-5 pb-4 lg:px-8">
-        <div className="grid grid-cols-3 gap-1 rounded-[16px] bg-[#EAE3D7] p-1 lg:max-w-[420px]">
-          {(['expense', 'income', 'balance'] as Tab[]).map((t) => (
-            <button
-              key={t}
-              onClick={() => setTab(t)}
-              className={`h-10 rounded-xl text-[14px] font-semibold ${
-                tab === t ? 'bg-white text-hh-pine shadow-[0_2px_8px_-4px_rgba(30,43,39,0.3)]' : 'bg-transparent text-[#5E5D57]'
-              }`}
-            >
-              {t === 'expense' ? '지출' : t === 'income' ? '수입' : '잔액'}
-            </button>
-          ))}
+        {/* 좁은 화면에서는 제목 줄 아래로 내려가고, 넓은 화면에서는 제목 옆에 붙는다. */}
+        <div className="order-3 w-full pt-3 lg:order-2 lg:w-auto lg:pt-0">
+          <div className="grid grid-cols-3 gap-1 rounded-[16px] bg-[#EAE3D7] p-1 lg:w-[300px]">
+            {(['expense', 'income', 'balance'] as Tab[]).map((t) => (
+              <button
+                key={t}
+                onClick={() => setTab(t)}
+                className={`h-10 rounded-xl text-[14px] font-semibold lg:h-[38px] ${
+                  tab === t ? 'bg-white text-hh-pine shadow-[0_2px_8px_-4px_rgba(30,43,39,0.3)]' : 'bg-transparent text-[#5E5D57]'
+                }`}
+              >
+                {t === 'expense' ? '지출' : t === 'income' ? '수입' : '잔액'}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 
-      {/* 차트가 대부분이라 2단으로 나누면 빈칸이 생긴다. 한 단을 유지하되 폭만 제한한다. */}
-      <div className="mx-auto flex w-full max-w-[900px] flex-col gap-4 px-5 pb-24 lg:gap-5 lg:px-8 lg:pb-12">
+      <div className="flex flex-col gap-4 px-5 pb-24 lg:grid lg:grid-cols-12 lg:items-start lg:gap-5 lg:px-0 lg:pb-0">
         {tab === 'expense' && (
           <>
-            <div className="flex flex-col gap-4 rounded-[24px] bg-white p-5">
-              <div className="flex flex-col gap-1">
-                <div className="text-[13px] text-hh-ink-muted">올해 총 지출 · 1–{monthsElapsed}월</div>
+            {/* 넓은 화면에서는 한 장짜리 요약 카드를 KPI 네 장으로 펼친다. */}
+            <div className="flex flex-col gap-4 rounded-[24px] bg-white p-5 lg:col-span-12 lg:grid lg:grid-cols-4 lg:gap-5 lg:rounded-none lg:bg-transparent lg:p-0">
+              <div className="flex flex-col gap-1 lg:gap-2 lg:rounded-[20px] lg:bg-hh-pine lg:px-6 lg:py-[22px] lg:text-white">
+                <div className="text-[13px] text-hh-ink-muted lg:text-white/75">올해 총 지출 · 1–{monthsElapsed}월</div>
                 <div className="flex items-baseline gap-1">
-                  <div className="text-[30px] font-bold tracking-tight">{formatWon(yearSpend)}</div>
-                  <div className="text-[15px] text-hh-ink-muted">원</div>
+                  <div className="text-[30px] font-bold tracking-tight lg:text-[28px] lg:font-extrabold">{formatWon(yearSpend)}</div>
+                  <div className="text-[15px] text-hh-ink-muted lg:text-[15px] lg:font-semibold lg:text-white/75">원</div>
                 </div>
               </div>
-              <div className="grid grid-cols-3 gap-2">
+              <div className="grid grid-cols-3 gap-2 lg:contents">
                 <MiniStat label="월평균" value={man(avgSpend)} />
                 <MiniStat label={`최다 · ${maxMonthIdx + 1}월`} value={man(maxSpend)} />
                 <MiniStat label={`최소 · ${minMonthIdx + 1}월`} value={man(minSpend)} />
               </div>
             </div>
 
-            <div className="flex flex-col gap-4 rounded-[24px] bg-white p-5">
+            <div className="flex flex-col gap-4 rounded-[24px] bg-white p-5 lg:col-span-12 lg:px-7 lg:py-6">
               <div className="flex items-start justify-between">
                 <div className="flex flex-col gap-1">
                   <div className="font-hh-serif text-[18px] font-bold">월별 지출 비교</div>
@@ -249,7 +251,7 @@ function StatsContent() {
             </div>
 
             {cardCategories.length > 0 && (
-              <div className="flex flex-col gap-4 rounded-[24px] bg-white p-5">
+              <div className="flex flex-col gap-4 rounded-[24px] bg-white p-5 lg:col-span-6 lg:px-7 lg:py-6">
                 <div className="flex items-baseline justify-between">
                   <div className="font-hh-serif text-[18px] font-bold">카드별 월별 지출</div>
                   {selectedCardId !== null && (
@@ -319,7 +321,7 @@ function StatsContent() {
             )}
 
             {cardCategories.length > 0 && (
-              <div className="flex flex-col gap-4 rounded-[24px] bg-white p-5">
+              <div className="flex flex-col gap-4 rounded-[24px] bg-white p-5 lg:col-span-6 lg:px-7 lg:py-6">
                 <div className="flex items-baseline justify-between">
                   <div className="font-hh-serif text-[18px] font-bold">카드별 최근 3개월 비교</div>
                   <div className="flex gap-2.5 text-[11px] text-hh-ink-muted">
@@ -363,7 +365,7 @@ function StatsContent() {
         )}
 
         {tab === 'income' && (
-          <div className="flex flex-col gap-4 rounded-[24px] bg-white p-5">
+          <div className="flex flex-col gap-4 rounded-[24px] bg-white p-5 lg:col-span-12 lg:px-7 lg:py-6">
             <div className="font-hh-serif text-[18px] font-bold">항목별 월별 수입</div>
             <div className="flex flex-wrap gap-x-3.5 gap-y-2">
               {INCOME_BUCKETS.map((name, i) => (
@@ -406,6 +408,7 @@ function StatsContent() {
           <BalanceChart balances={balances} currentMonthIdx={currentMonthIdx} />
         )}
       </div>
+      </main>
 
       <HouseholdBottomNav />
     </div>
@@ -423,9 +426,9 @@ function maxCardStackTotal(cardCategories: { cat: ExpenseCategory }[], sumFor: (
 
 function MiniStat({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex flex-col gap-1 rounded-[16px] bg-hh-bg p-3">
-      <div className="text-[11px] text-hh-ink-muted">{label}</div>
-      <div className="text-[14px] font-bold">{value}</div>
+    <div className="flex flex-col gap-1 rounded-[16px] bg-hh-bg p-3 lg:gap-2 lg:rounded-[20px] lg:bg-white lg:px-6 lg:py-[22px]">
+      <div className="text-[11px] text-hh-ink-muted lg:text-[13px]">{label}</div>
+      <div className="text-[14px] font-bold lg:text-[28px] lg:font-extrabold lg:tracking-tight">{value}</div>
     </div>
   )
 }
@@ -532,7 +535,7 @@ function BalanceChart({ balances, currentMonthIdx }: { balances: number[]; curre
   const areaD = d ? `${d} L${W} ${top} L0 ${top} Z` : ''
 
   return (
-    <div className="flex flex-col gap-3.5 rounded-[24px] bg-white p-5">
+    <div className="flex flex-col gap-3.5 rounded-[24px] bg-white p-5 lg:col-span-12 lg:px-7 lg:py-6">
       <div className="flex items-start justify-between">
         <div className="flex flex-col gap-1">
           <div className="font-hh-serif text-[18px] font-bold">누적 잔액 추이</div>

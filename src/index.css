@@ -30,6 +30,8 @@
   --color-gold-tint: #fbf1da;
 
   --color-hh-bg: #F5F1EA;
+  /* 넓은 화면 사이드바 바탕. 본문 배경보다 한 톤 짙어 화면이 갈라져 보인다. */
+  --color-hh-sidebar: #EFE8DE;
   --color-hh-ink: #1E2B27;
   --color-hh-ink-muted: #6B6A63;
   --color-hh-border: #E4DDD1;

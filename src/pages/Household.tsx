@@ -280,7 +280,7 @@ function HouseholdContent() {
 
   if (categoriesFailed) {
     return (
-      <div className="flex min-h-svh flex-col bg-hh-bg">
+      <div className="flex min-h-svh flex-col bg-hh-bg lg:flex-row">
         <HouseholdNav />
         <div className="flex-1">
           <LoadError screen={false} message="항목 정보를 불러오지 못했어요." onRetry={retryCategories} />
@@ -291,7 +291,7 @@ function HouseholdContent() {
 
   if (entriesFailed) {
     return (
-      <div className="flex min-h-svh flex-col bg-hh-bg">
+      <div className="flex min-h-svh flex-col bg-hh-bg lg:flex-row">
         <HouseholdNav />
         <div className="flex-1">
           <LoadError screen={false} message="데이터를 불러오지 못했어요." onRetry={retryEntries} />
@@ -302,7 +302,7 @@ function HouseholdContent() {
 
   if (!categories || !entries || !summary) {
     return (
-      <div className="flex min-h-svh flex-col bg-hh-bg">
+      <div className="flex min-h-svh flex-col bg-hh-bg lg:flex-row">
         <HouseholdNav />
         <Loading />
       </div>
@@ -310,40 +310,68 @@ function HouseholdContent() {
   }
 
   return (
-    <div className="flex min-h-svh flex-col bg-hh-bg font-hh-sans text-hh-ink" style={{ fontVariantNumeric: 'tabular-nums' }}>
+    <div className="flex min-h-svh flex-col bg-hh-bg font-hh-sans text-hh-ink lg:flex-row" style={{ fontVariantNumeric: 'tabular-nums' }}>
       <HouseholdNav />
 
-      {/* 월 전환 */}
-      <div className="mx-auto flex w-full max-w-[1180px] items-center justify-between px-3 pb-3 pt-1 lg:justify-start lg:gap-2 lg:px-8 lg:pb-5 lg:pt-6">
-        <button type="button" aria-label="이전 달" onClick={() => goMonth(-1)} className="flex h-11 w-11 items-center justify-center rounded-full">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#1E2B27" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="m15 6-6 6 6 6" />
+      <main className="flex min-w-0 flex-1 flex-col lg:gap-5 lg:px-10 lg:pb-10 lg:pt-7">
+      {/* 월 전환 + 화면 단위 동작 */}
+      <div className="flex items-center justify-between px-3 pb-3 pt-1 lg:px-0 lg:pb-0 lg:pt-0">
+        <div className="contents lg:flex lg:items-center lg:gap-2">
+          <button
+            type="button"
+            aria-label="이전 달"
+            onClick={() => goMonth(-1)}
+            className="flex h-11 w-11 items-center justify-center rounded-full lg:order-first lg:h-11 lg:w-11 lg:rounded-xl lg:border lg:border-hh-border lg:bg-white"
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#1E2B27" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="m15 6-6 6 6 6" />
+            </svg>
+          </button>
+          <button type="button" onClick={() => setPickerOpen(true)} className="relative flex flex-col items-center gap-0.5 lg:flex-row lg:items-baseline lg:gap-1.5 lg:px-3">
+            <span className="text-[12px] text-hh-ink-muted lg:text-[26px] lg:font-extrabold lg:tracking-tight lg:text-hh-ink">
+              {year}
+              <span className="hidden lg:inline">년</span>
+            </span>
+            <span className="font-hh-serif text-[24px] font-bold lg:text-[26px] lg:font-extrabold lg:tracking-tight">{month}월</span>
+            {pickerOpen && (
+              <MonthYearPicker year={year} month={month} onPick={(y, m) => { setYear(y); setMonth(m); setPickerOpen(false) }} onClose={() => setPickerOpen(false)} />
+            )}
+          </button>
+          <button
+            type="button"
+            aria-label="다음 달"
+            onClick={() => goMonth(1)}
+            className="flex h-11 w-11 items-center justify-center rounded-full lg:h-11 lg:w-11 lg:rounded-xl lg:border lg:border-hh-border lg:bg-white"
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#1E2B27" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="m9 6 6 6-6 6" />
+            </svg>
+          </button>
+        </div>
+        <button
+          type="button"
+          onClick={() => setImportOpen(true)}
+          className="hidden h-11 items-center gap-2 rounded-xl border border-hh-border bg-white px-4 text-[14px] font-semibold text-hh-ink lg:flex"
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M12 15V3M7 8l5-5 5 5M4 15v4a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-4" />
           </svg>
-        </button>
-        <button type="button" onClick={() => setPickerOpen(true)} className="relative flex flex-col items-center gap-0.5 lg:order-first lg:flex-row lg:items-baseline lg:gap-2">
-          <span className="text-[12px] text-hh-ink-muted">{year}</span>
-          <span className="font-hh-serif text-[24px] font-bold">{month}월</span>
-          {pickerOpen && (
-            <MonthYearPicker year={year} month={month} onPick={(y, m) => { setYear(y); setMonth(m); setPickerOpen(false) }} onClose={() => setPickerOpen(false)} />
-          )}
-        </button>
-        <button type="button" aria-label="다음 달" onClick={() => goMonth(1)} className="flex h-11 w-11 items-center justify-center rounded-full">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#1E2B27" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="m9 6 6 6-6 6" />
-          </svg>
+          PDF 가져오기
         </button>
       </div>
 
-      <div className="mx-auto flex w-full max-w-[1180px] flex-col gap-4 px-5 pb-24 lg:grid lg:grid-cols-2 lg:items-start lg:gap-5 lg:px-8 lg:pb-12">
+      <div className="flex flex-col gap-4 px-5 pb-24 lg:grid lg:grid-cols-12 lg:items-start lg:gap-5 lg:px-0 lg:pb-0">
         {/* 히어로 */}
-        <div className="flex flex-col gap-[18px] rounded-[28px] bg-hh-pine p-6 text-white shadow-[0_18px_40px_-24px_rgba(34,67,59,0.7)] lg:h-full lg:justify-between">
+        <div className="flex flex-col gap-[18px] rounded-[28px] bg-hh-pine p-6 text-white shadow-[0_18px_40px_-24px_rgba(34,67,59,0.7)] lg:col-span-7 lg:h-full lg:justify-between lg:rounded-3xl lg:px-8 lg:py-7">
           <div className="flex items-center justify-between">
             <div className="text-[14px] text-[#CFDDD5]">이번 달 남은 돈</div>
             <div className="text-[12px] text-[#CFDDD5]">전달 이월 {formatWon(carriedIn)}원</div>
           </div>
           <div className="flex items-baseline gap-1.5">
-            <div className="text-[40px] font-bold tracking-tight">{formatWon(monthSummary?.balance ?? openingBalance)}</div>
-            <div className="text-[18px] text-[#CFDDD5]">원</div>
+            <div className="text-[40px] font-bold tracking-tight lg:text-[52px] lg:font-extrabold lg:leading-none">
+              {formatWon(monthSummary?.balance ?? openingBalance)}
+            </div>
+            <div className="text-[18px] text-[#CFDDD5] lg:text-[20px] lg:font-semibold">원</div>
           </div>
           {income > 0 && (
             <div className="flex flex-col gap-2">
@@ -360,19 +388,19 @@ function HouseholdContent() {
             </div>
           )}
           <div className="grid grid-cols-2 gap-3">
-            <div className="flex flex-col gap-1 rounded-[18px] bg-white/10 p-3.5">
-              <div className="text-[12px] text-[#CFDDD5]">수입</div>
-              <div className="text-[17px] font-semibold">{formatWon(income)}</div>
+            <div className="flex flex-col gap-1 rounded-[18px] bg-white/10 p-3.5 lg:rounded-2xl lg:px-[18px] lg:py-4">
+              <div className="text-[12px] text-[#CFDDD5] lg:text-[13px]">수입</div>
+              <div className="text-[17px] font-semibold lg:text-[22px] lg:font-bold">{formatWon(income)}</div>
             </div>
-            <div className="flex flex-col gap-1 rounded-[18px] bg-white/10 p-3.5">
-              <div className="text-[12px] text-[#CFDDD5]">지출</div>
-              <div className="text-[17px] font-semibold">{formatWon(expenseTotal)}</div>
+            <div className="flex flex-col gap-1 rounded-[18px] bg-white/10 p-3.5 lg:rounded-2xl lg:px-[18px] lg:py-4">
+              <div className="text-[12px] text-[#CFDDD5] lg:text-[13px]">지출</div>
+              <div className="text-[17px] font-semibold lg:text-[22px] lg:font-bold">{formatWon(expenseTotal)}</div>
             </div>
           </div>
         </div>
 
         {/* KPI */}
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-2 gap-3 lg:col-span-5 lg:gap-5">
           <KpiCard
             label="전월 대비 지출"
             value={momAmt !== null ? `${momAmt >= 0 ? '−' : '+'}${formatWon(Math.abs(momAmt))}` : '—'}
@@ -386,7 +414,7 @@ function HouseholdContent() {
 
         {/* 지출 구성 */}
         {donutGroups.total > 0 && (
-          <div className="flex flex-col gap-4 rounded-[24px] bg-white p-5">
+          <div className="flex flex-col gap-4 rounded-[24px] bg-white p-5 lg:col-span-5 lg:gap-5 lg:px-7 lg:py-6">
             <div className="flex items-baseline justify-between">
               <div className="font-hh-serif text-[18px] font-bold">지출 구성</div>
               <Link to="/household/stats" replace className="text-[13px] font-semibold no-underline text-hh-pine">
@@ -421,7 +449,7 @@ function HouseholdContent() {
 
         {/* 카드별 사용액 */}
         {cardStats.length > 0 && (
-          <div className="flex flex-col gap-4 rounded-[24px] bg-white p-5">
+          <div className="flex flex-col gap-4 rounded-[24px] bg-white p-5 lg:col-span-7 lg:gap-[18px] lg:px-7 lg:py-6">
             <div className="flex items-baseline justify-between">
               <div className="font-hh-serif text-[18px] font-bold">카드별 사용액</div>
               <div className="text-[12px] text-hh-ink-muted">지난달 대비</div>
@@ -431,26 +459,28 @@ function HouseholdContent() {
                 key={c.id}
                 type="button"
                 onClick={() => setEditing(categoryById.get(c.id) ?? null)}
-                className="flex flex-col gap-2 border-none bg-transparent p-0 text-left"
+                className="flex flex-wrap items-center gap-x-2.5 gap-y-2 border-none bg-transparent p-0 text-left lg:flex-nowrap lg:gap-4"
               >
-                <div className="flex items-center gap-2.5">
-                  <div className="h-[22px] w-8 flex-none rounded-[5px]" style={{ background: c.color }} />
-                  <div className="flex-1 text-[14px] font-medium text-hh-ink">{c.name}</div>
-                  <div className="text-[14px] font-semibold text-hh-ink">{formatWon(c.amount)}</div>
-                  {c.delta !== null && (
-                    <div
-                      className="min-w-[52px] rounded-full px-1.5 py-0.5 text-center text-[11px] font-semibold"
-                      style={{
-                        color: c.delta > 0 ? 'var(--color-hh-up)' : 'var(--color-hh-down)',
-                        background: c.delta > 0 ? 'var(--color-hh-up-tint)' : 'var(--color-hh-down-tint)',
-                      }}
-                    >
-                      {c.delta > 0 ? '▲' : '▼'} {Math.abs(c.delta).toFixed(1)}%
-                    </div>
-                  )}
+                {/* 좁은 화면에서는 막대가 줄바꿈되어 이름 줄 아래에 깔리고,
+                    넓은 화면에서는 order로 이름과 금액 사이에 들어간다. */}
+                <div className="order-1 h-[22px] w-8 flex-none rounded-[5px] lg:h-3 lg:w-3 lg:rounded" style={{ background: c.color }} />
+                <div className="order-2 flex-1 text-[14px] font-medium text-hh-ink lg:w-[84px] lg:flex-none">{c.name}</div>
+                <div className="order-3 text-[14px] font-semibold text-hh-ink lg:order-5 lg:w-[96px] lg:flex-none lg:text-right lg:text-[15px] lg:font-bold">
+                  {formatWon(c.amount)}
                 </div>
-                <div className="h-1.5 overflow-hidden rounded-full bg-hh-divider">
-                  <div className="h-1.5 rounded-full" style={{ width: `${c.bar}%`, background: c.color }} />
+                {c.delta !== null && (
+                  <div
+                    className="order-4 min-w-[52px] rounded-full px-1.5 py-0.5 text-center text-[11px] font-semibold lg:order-6 lg:min-w-[60px] lg:flex-none lg:text-[12px]"
+                    style={{
+                      color: c.delta > 0 ? 'var(--color-hh-up)' : 'var(--color-hh-down)',
+                      background: c.delta > 0 ? 'var(--color-hh-up-tint)' : 'var(--color-hh-down-tint)',
+                    }}
+                  >
+                    {c.delta > 0 ? '▲' : '▼'} {Math.abs(c.delta).toFixed(1)}%
+                  </div>
+                )}
+                <div className="order-5 h-1.5 w-full overflow-hidden rounded-full bg-hh-divider lg:order-4 lg:h-2.5 lg:w-auto lg:flex-1">
+                  <div className="h-1.5 rounded-full lg:h-2.5" style={{ width: `${c.bar}%`, background: c.color }} />
                 </div>
               </button>
             ))}
@@ -472,27 +502,28 @@ function HouseholdContent() {
         )}
 
         {/* 입력 내역 */}
-        <div className="flex items-center justify-between pt-1 lg:col-span-2 lg:pt-3">
-          <div className="font-hh-serif text-[18px] font-bold">{month}월 입력 내역</div>
+        <div className="flex items-center justify-between pt-1 lg:col-span-12 lg:pt-3">
+          <div className="font-hh-serif text-[18px] font-bold lg:text-[19px] lg:font-extrabold">{month}월 입력 내역</div>
           <button
             type="button"
             onClick={() => setImportOpen(true)}
-            className="rounded-full border border-hh-border bg-white px-3 py-1.5 text-[12px] font-semibold text-hh-pine"
+            className="rounded-full border border-hh-border bg-white px-3 py-1.5 text-[12px] font-semibold text-hh-pine lg:hidden"
           >
             PDF 가져오기
           </button>
+          <span className="hidden text-[13px] text-hh-ink-muted lg:block">항목을 클릭하면 바로 수정할 수 있어요</span>
         </div>
         {/* 그룹 카드는 길이가 제각각이라 그리드로 놓으면 행 높이에 묶여 빈칸이 생긴다.
             넓은 화면에서는 다단으로 흘려 빈틈 없이 채운다. */}
-        <div className="flex flex-col gap-4 lg:col-span-2 lg:block lg:columns-2 lg:gap-5">
+        <div className="flex flex-col gap-4 lg:col-span-12 lg:block lg:columns-4 lg:gap-5">
         {sections.map((s) => (
-          <div key={s.group} className="flex flex-col rounded-[24px] bg-white px-2 pb-1.5 pt-1 lg:mb-5 lg:break-inside-avoid">
-            <div className="flex items-center justify-between px-3 py-2.5">
+          <div key={s.group} className="flex flex-col rounded-[24px] bg-white px-2 pb-1.5 pt-1 lg:mb-5 lg:break-inside-avoid lg:rounded-[20px] lg:px-5 lg:pb-3 lg:pt-[18px]">
+            <div className="flex items-center justify-between px-3 py-2.5 lg:border-b lg:border-hh-divider lg:px-0 lg:pt-0">
               <div className="flex items-center gap-2">
                 <div className="h-2 w-2 rounded-full" style={{ background: s.color }} />
-                <div className="text-[13px] font-semibold text-[#4A4A44]">{s.title}</div>
+                <div className="text-[13px] font-semibold text-[#4A4A44] lg:text-[14px] lg:font-bold lg:text-hh-ink">{s.title}</div>
               </div>
-              <div className="text-[13px] font-semibold" style={{ color: s.group === 'income' ? 'var(--color-hh-down)' : '#1E2B27' }}>
+              <div className="text-[13px] font-semibold lg:text-[14px] lg:font-bold" style={{ color: s.group === 'income' ? 'var(--color-hh-down)' : '#1E2B27' }}>
                 {s.group === 'income' ? '+' : '−'}
                 {formatWon(s.total)}
               </div>
@@ -513,12 +544,12 @@ function HouseholdContent() {
                   key={cat.id}
                   type="button"
                   onClick={() => setEditing(cat)}
-                  className="flex min-h-[52px] items-center justify-between rounded-[14px] border-none bg-transparent px-3 text-left text-hh-ink"
+                  className="flex min-h-[52px] items-center justify-between rounded-[14px] border-none bg-transparent px-3 text-left text-hh-ink lg:min-h-[46px] lg:rounded-none lg:border-b lg:border-[#F4F0EA] lg:px-1"
                 >
-                  <div className="text-[15px]">{cat.name}</div>
+                  <div className="text-[15px] lg:text-[14px]">{cat.name}</div>
                   <div className="flex items-center gap-2">
-                    <div className="text-[15px] font-semibold">{formatWon(sumFor(cat.id, month))}</div>
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#B3AEA3" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <div className="text-[15px] font-semibold lg:text-[14px]">{formatWon(sumFor(cat.id, month))}</div>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#B3AEA3" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lg:hidden">
                       <path d="m9 6 6 6-6 6" />
                     </svg>
                   </div>
@@ -529,6 +560,7 @@ function HouseholdContent() {
         ))}
         </div>
       </div>
+      </main>
 
       <HouseholdBottomNav />
 

@@ -71,7 +71,7 @@ function CategoriesContent() {
 
   if (loadFailed) {
     return (
-      <div className="flex min-h-svh flex-col bg-hh-bg">
+      <div className="flex min-h-svh flex-col bg-hh-bg lg:flex-row">
         <HouseholdNav />
         <div className="flex-1">
           <LoadError screen={false} message="항목 정보를 불러오지 못했어요." onRetry={reload} />
@@ -82,7 +82,7 @@ function CategoriesContent() {
 
   if (!categories) {
     return (
-      <div className="flex min-h-svh flex-col bg-hh-bg">
+      <div className="flex min-h-svh flex-col bg-hh-bg lg:flex-row">
         <HouseholdNav />
         <Loading />
       </div>
@@ -90,10 +90,14 @@ function CategoriesContent() {
   }
 
   return (
-    <div className="flex min-h-svh flex-col bg-hh-bg font-hh-sans text-hh-ink">
+    <div className="flex min-h-svh flex-col bg-hh-bg font-hh-sans text-hh-ink lg:flex-row">
       <HouseholdNav />
-      <div className="mx-auto w-full max-w-[720px] flex-1 px-5 pb-24 lg:px-8 lg:pb-12">
-        <h1 className="pt-3 font-hh-serif text-[20px] font-bold lg:pt-6">카테고리 관리</h1>
+      <main className="min-w-0 flex-1 px-5 pb-24 lg:px-10 lg:pb-10 lg:pt-7">
+        <div className="flex flex-wrap items-baseline gap-x-4 pt-3 lg:pt-0">
+          <h1 className="m-0 font-hh-serif text-[20px] font-bold lg:text-[26px] lg:font-extrabold lg:tracking-tight">카테고리 관리</h1>
+          <span className="hidden text-[14px] text-hh-ink-muted lg:block">입력 내역과 지출 구성 차트의 묶음 단위예요</span>
+        </div>
+        <div className="lg:mt-5 lg:max-w-[760px] lg:rounded-3xl lg:bg-white lg:px-7 lg:py-6">
 
         <div className="mt-4 flex gap-2">
           <input
@@ -145,7 +149,8 @@ function CategoriesContent() {
               ))}
           </div>
         ))}
-      </div>
+        </div>
+      </main>
       <HouseholdBottomNav />
     </div>
   )
