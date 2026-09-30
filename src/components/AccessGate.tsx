@@ -10,8 +10,9 @@ function hasValidAccess(): boolean {
   return isAccessTokenValid(localStorage.getItem(TOKEN_KEY), Date.now())
 }
 
-/** 가계부 화면을 감싸는 접근 게이트. 유효한 토큰이 없으면 비밀번호 팝업을 띄운다. */
-export function HouseholdGate({ children }: { children: ReactNode }) {
+/** 비밀번호로 보호되는 화면(가계부·OPIC)을 감싸는 접근 게이트.
+ *  두 메뉴가 같은 토큰을 쓰므로 한쪽에서 로그인하면 다른 쪽도 바로 열린다. */
+export function AccessGate({ children }: { children: ReactNode }) {
   const [unlocked, setUnlocked] = useState(hasValidAccess)
   const navigate = useNavigate()
 

@@ -188,6 +188,17 @@ export function InfoIcon(props: IconProps) {
   )
 }
 
+/** OPIC 메뉴용 마이크. 말하기 시험이라는 성격을 드러낸다. */
+export function MicIcon(props: IconProps) {
+  return (
+    <svg {...base(props)}>
+      <path d="M12 15a3.5 3.5 0 0 0 3.5-3.5v-5a3.5 3.5 0 0 0-7 0v5A3.5 3.5 0 0 0 12 15Z" />
+      <path d="M5.5 11.5a6.5 6.5 0 0 0 13 0" />
+      <path d="M12 18v3" />
+    </svg>
+  )
+}
+
 export function WalletIcon(props: IconProps) {
   return (
     <svg {...base(props)}>

@@ -47,6 +47,23 @@
   --color-hh-gold-tint: #F4E9D2;
   --color-hh-neutral: #B3AEA3;
   --color-hh-divider: #ECE6DC;
+  /* OPIC 전용. 가계부(--color-hh-*)와 섞지 않는다. */
+  --color-op-bg: #F6F4EF;
+  --color-op-surface: #FBFAF6;
+  --color-op-ink: #1A1D26;
+  --color-op-ink-muted: #5B606B;
+  --color-op-border: #E4E0D6;
+  --color-op-accent: #3346C8;
+  --color-op-accent-tint: #E6E9FB;
+  --color-op-eva: #9A3B6E;
+  --color-op-eva-tint: #F8EDF3;
+  --color-op-marker: #FFE27A;
+  /* 암기 상태 3색. 명도가 서로 달라 색약에서도 구분되지만 항상 글자와 함께 쓴다. */
+  --color-op-done: #15803D;
+  --color-op-ok: #D69E2E;
+  --color-op-weak: #E0662B;
+  --font-op-serif: 'Source Serif 4', Georgia, serif;
+
   --color-hh-up: #A5522B;
   --color-hh-up-tint: #F7E6DC;
   --color-hh-down: #2F6B4F;

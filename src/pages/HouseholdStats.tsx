@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { HouseholdGate } from '../components/HouseholdGate'
+import { AccessGate } from '../components/AccessGate'
 import { HouseholdNav } from '../components/HouseholdNav'
 import { HouseholdBottomNav } from '../components/HouseholdBottomNav'
 import { LoadError } from '../components/LoadError'
@@ -35,9 +35,9 @@ function monthOpacity(index: number, total: number) {
 
 export function HouseholdStats() {
   return (
-    <HouseholdGate>
+    <AccessGate>
       <StatsContent />
-    </HouseholdGate>
+    </AccessGate>
   )
 }
 

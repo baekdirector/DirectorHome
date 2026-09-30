@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { HouseholdGate } from '../components/HouseholdGate'
+import { AccessGate } from '../components/AccessGate'
 import { HouseholdNav } from '../components/HouseholdNav'
 import { HouseholdBottomNav } from '../components/HouseholdBottomNav'
 import { LoadError } from '../components/LoadError'
@@ -16,9 +16,9 @@ const GROUP_OPTIONS: { value: ExpenseGroup; label: string }[] = [
 
 export function HouseholdCategories() {
   return (
-    <HouseholdGate>
+    <AccessGate>
       <CategoriesContent />
-    </HouseholdGate>
+    </AccessGate>
   )
 }
 

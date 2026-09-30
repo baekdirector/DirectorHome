@@ -11,6 +11,9 @@ import { ParentSessionDetail } from './pages/ParentSessionDetail'
 import { Household } from './pages/Household'
 import { HouseholdCategories } from './pages/HouseholdCategories'
 import { HouseholdStats } from './pages/HouseholdStats'
+import { OpicHome } from './pages/OpicHome'
+import { OpicTopic } from './pages/OpicTopic'
+import { OpicScript } from './pages/OpicScript'
 import { HouseholdBackGuard } from './components/HouseholdBackGuard'
 
 function App() {
@@ -33,6 +36,9 @@ function App() {
         <Route path="/household" element={<Household />} />
         <Route path="/household/stats" element={<HouseholdStats />} />
         <Route path="/household/categories" element={<HouseholdCategories />} />
+        <Route path="/opic" element={<OpicHome />} />
+        <Route path="/opic/t/:topicId" element={<OpicTopic />} />
+        <Route path="/opic/t/:topicId/q/:questionId" element={<OpicScript />} />
       </Routes>
     </BrowserRouter>
   )

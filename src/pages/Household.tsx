@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { HouseholdGate } from '../components/HouseholdGate'
+import { AccessGate } from '../components/AccessGate'
 import { HouseholdNav } from '../components/HouseholdNav'
 import { HouseholdBottomNav } from '../components/HouseholdBottomNav'
 import { LoadError } from '../components/LoadError'
@@ -47,9 +47,9 @@ const ITEMIZED_CATEGORY_NAMES = new Set(['추가 지출액', '추가 입금액']
 
 export function Household() {
   return (
-    <HouseholdGate>
+    <AccessGate>
       <HouseholdContent />
-    </HouseholdGate>
+    </AccessGate>
   )
 }
 
