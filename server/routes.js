@@ -570,3 +570,75 @@ router.get('/expense/summary', async (req, res) => {
 
   res.json({ months, openingBalance: Number(settings.openingBalance) })
 })
+
+// ===== OPIC 스크립트 암기장 =====
+// 접근 제한은 가계부와 같은 비밀번호 게이트를 화면에서 공유한다(/expense/verify-password).
+
+router.get('/opic/topics', async (_req, res) => {
+  const { rows } = await pool.query(`
+    SELECT t.id, t.name, t.stars, t.kind,
+           COUNT(q.id)::int AS total,
+           COUNT(*) FILTER (WHERE s.state = 'done')::int AS done,
+           COUNT(*) FILTER (WHERE s.state = 'ok')::int   AS ok,
+           COUNT(*) FILTER (WHERE s.state = 'weak')::int AS weak
+    FROM opic_topics t
+    LEFT JOIN opic_questions q ON q.topic_id = t.id
+    LEFT JOIN opic_status s    ON s.answer_hash = q.answer_hash
+    GROUP BY t.id
+    ORDER BY t.display_order
+  `)
+  res.json(rows)
+})
+
+router.get('/opic/topics/:id/questions', async (req, res) => {
+  const { rows } = await pool.query(
+    `SELECT q.id, q.set_label AS "setLabel", q.seq, q.level,
+            q.title_ko AS "titleKo", q.alt_titles AS "altTitles",
+            q.importance, q.source_ref AS "sourceRef",
+            q.shared_question AS "sharedQuestion",
+            q.answer_hash AS "answerHash", s.state
+     FROM opic_questions q
+     LEFT JOIN opic_status s ON s.answer_hash = q.answer_hash
+     WHERE q.topic_id = $1
+     ORDER BY q.seq`,
+    [req.params.id],
+  )
+  res.json(rows)
+})
+
+router.get('/opic/questions/:id', async (req, res) => {
+  const { rows } = await pool.query(
+    `SELECT q.id, q.topic_id AS "topicId", q.set_label AS "setLabel", q.seq, q.level,
+            q.title_ko AS "titleKo", q.alt_titles AS "altTitles", q.importance,
+            q.question_en AS "questionEn", q.answer_en AS "answerEn",
+            q.source_ref AS "sourceRef", q.shared_question AS "sharedQuestion",
+            q.answer_hash AS "answerHash", s.state
+     FROM opic_questions q
+     LEFT JOIN opic_status s ON s.answer_hash = q.answer_hash
+     WHERE q.id = $1`,
+    [req.params.id],
+  )
+  if (rows.length === 0) return res.status(404).json({ error: 'not found' })
+  res.json(rows[0])
+})
+
+// 상태는 답변 해시에 붙으므로, 본문이 같은 다른 문항에도 함께 반영된다.
+router.put('/opic/status', async (req, res) => {
+  const { answerHash, state } = req.body
+  if (!answerHash) return res.status(400).json({ error: 'answerHash required' })
+  if (state === null || state === undefined) {
+    await pool.query('DELETE FROM opic_status WHERE answer_hash = $1', [answerHash])
+  } else {
+    await pool.query(
+      `INSERT INTO opic_status (answer_hash, state, updated_at) VALUES ($1,$2,$3)
+       ON CONFLICT (answer_hash) DO UPDATE SET state = $2, updated_at = $3`,
+      [answerHash, state, Date.now()],
+    )
+  }
+  res.json({ ok: true })
+})
+
+router.get('/opic/patterns', async (_req, res) => {
+  const { rows } = await pool.query('SELECT text FROM opic_patterns ORDER BY topic_count DESC')
+  res.json(rows.map((r) => r.text))
+})
