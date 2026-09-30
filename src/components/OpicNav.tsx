@@ -2,20 +2,18 @@ import { useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { AppDrawer } from './AppDrawer'
 
+/** OPIC 안에서 오갈 화면들. 서비스 전환(JunsVoca·가계부)은 브랜드를 눌러 여는 드로우어가 맡는다. */
 const TABS = [
-  { to: '/household', label: '가계부' },
-  { to: '/opic', label: 'OPIC' },
+  { to: '/opic', label: 'OPIC 스크립트', exact: true },
+  { to: '/opic/mock', label: '사전 모의테스트', exact: false },
 ]
 
-/**
- * OPIC 화면의 주 메뉴.
- * 좁은 화면에서는 상단 바만 두고, 넓은 화면에서는 왼쪽 검정 사이드바가 된다.
- * 동작하는 항목만 둔다 — 복습함·음성 설정은 그 기능이 생기는 단계에 추가한다.
- */
 export function OpicNav() {
   const [drawerOpen, setDrawerOpen] = useState(false)
   const { pathname } = useLocation()
-  const onOpic = pathname.startsWith('/opic')
+
+  const isActive = (to: string, exact: boolean) =>
+    exact ? pathname === to || pathname.startsWith('/opic/t/') : pathname.startsWith(to)
 
   const brand = (
     <button
@@ -25,7 +23,7 @@ export function OpicNav() {
       className="flex items-center gap-2.5"
     >
       <img src="/icons/icon-192.png" alt="" width={36} height={36} className="h-9 w-9 flex-none rounded-[10px]" />
-      <span className="text-[18px] font-bold tracking-tight">OPIC 스크립트</span>
+      <span className="text-[19px] font-bold tracking-tight">OPIC</span>
     </button>
   )
 
@@ -38,7 +36,7 @@ export function OpicNav() {
           <div className="px-2 text-white">{brand}</div>
           <div className="flex flex-col gap-1">
             {TABS.map((tab) => {
-              const active = tab.to === '/opic' ? onOpic : pathname.startsWith(tab.to)
+              const active = isActive(tab.to, tab.exact)
               return (
                 <Link
                   key={tab.to}
@@ -53,7 +51,6 @@ export function OpicNav() {
               )
             })}
           </div>
-          <div className="mt-auto px-3 text-[13px] text-[#9CA1AE]">가계부와 같은 비밀번호</div>
         </div>
       </nav>
 

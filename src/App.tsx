@@ -14,6 +14,7 @@ import { HouseholdStats } from './pages/HouseholdStats'
 import { OpicHome } from './pages/OpicHome'
 import { OpicTopic } from './pages/OpicTopic'
 import { OpicScript } from './pages/OpicScript'
+import { OpicMock } from './pages/OpicMock'
 import { HouseholdBackGuard } from './components/HouseholdBackGuard'
 
 function App() {
@@ -39,6 +40,7 @@ function App() {
         <Route path="/opic" element={<OpicHome />} />
         <Route path="/opic/t/:topicId" element={<OpicTopic />} />
         <Route path="/opic/t/:topicId/q/:questionId" element={<OpicScript />} />
+        <Route path="/opic/mock" element={<OpicMock />} />
       </Routes>
     </BrowserRouter>
   )
