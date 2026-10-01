@@ -116,6 +116,12 @@ export async function migrate() {
     -- 기존 DB에 남아있던 "카테고리당 월 하나" UNIQUE 제약을 제거한다(품목별 다중 입력을 허용하기 위해).
     ALTER TABLE expense_entries DROP CONSTRAINT IF EXISTS expense_entries_category_id_year_month_key;
 
+    -- 동사 3단변화 단어장. 새 테이블을 만들면 wrong_notes·통계가 쓰는 word_id 배관이
+    -- 두 갈래로 갈라지므로 기존 테이블에 칸을 더한다. 일반 단어장은 NULL로 남는다.
+    ALTER TABLE word_sets ADD COLUMN IF NOT EXISTS kind TEXT NOT NULL DEFAULT 'vocab';
+    ALTER TABLE words ADD COLUMN IF NOT EXISTS past TEXT;
+    ALTER TABLE words ADD COLUMN IF NOT EXISTS participle TEXT;
+
     -- OPIC 스크립트 암기장. 원본은 사용자가 관리하는 엑셀이고 여기는 그 사본이다.
     -- 임포트가 지우고 다시 넣는 방식이라 시트명을 대조용으로 들고 있을 필요가 없다.
     CREATE TABLE IF NOT EXISTS opic_topics (

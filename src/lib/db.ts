@@ -6,6 +6,8 @@ export interface WordSetRecord {
   id: number
   title: string
   createdAt: number
+  /** 'verb'면 동사 3단변화 단어장이다. */
+  kind: 'vocab' | 'verb'
 }
 
 export interface WordRecord {
@@ -15,6 +17,9 @@ export interface WordRecord {
   meaning: string
   isIdiom: boolean
   partOfSpeech?: string
+  /** 동사 단어장에서만 채워진다. 일반 단어장은 null. */
+  past?: string | null
+  participle?: string | null
 }
 
 export type QuestionType = 'spelling' | 'meaning'
@@ -60,11 +65,12 @@ async function api<T>(path: string, init?: RequestInit): Promise<T> {
 
 export async function createWordSet(
   title: string,
-  words: Array<Pick<WordRecord, 'term' | 'meaning' | 'isIdiom' | 'partOfSpeech'>>,
+  words: Array<Pick<WordRecord, 'term' | 'meaning' | 'isIdiom' | 'partOfSpeech' | 'past' | 'participle'>>,
+  kind: 'vocab' | 'verb' = 'vocab',
 ): Promise<number> {
   const { id } = await api<{ id: number }>('/wordsets', {
     method: 'POST',
-    body: JSON.stringify({ title, words }),
+    body: JSON.stringify({ title, words, kind }),
   })
   return id
 }

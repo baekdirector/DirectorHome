@@ -92,7 +92,7 @@ async function updateWrongNote(client, answer, { groupId, round, finishedAt }) {
 
 router.get('/wordsets', async (_req, res) => {
   const { rows } = await pool.query(`
-    SELECT ws.id, ws.title, ws.created_at AS "createdAt", COUNT(w.id)::int AS count
+    SELECT ws.id, ws.title, ws.kind, ws.created_at AS "createdAt", COUNT(w.id)::int AS count
     FROM word_sets ws
     LEFT JOIN words w ON w.word_set_id = ws.id
     GROUP BY ws.id
@@ -130,7 +130,8 @@ router.get('/wordsets/:id', async (req, res) => {
 
 router.get('/wordsets/:id/words', async (req, res) => {
   const { rows } = await pool.query(
-    `SELECT id, word_set_id AS "wordSetId", term, meaning, is_idiom AS "isIdiom", part_of_speech AS "partOfSpeech"
+    `SELECT id, word_set_id AS "wordSetId", term, meaning, is_idiom AS "isIdiom",
+            part_of_speech AS "partOfSpeech", past, participle
      FROM words WHERE word_set_id = $1 ORDER BY id`,
     [req.params.id],
   )
@@ -138,22 +139,24 @@ router.get('/wordsets/:id/words', async (req, res) => {
 })
 
 router.post('/wordsets', async (req, res) => {
-  const { title, words } = req.body
+  const { title, words, kind } = req.body
   if (!title || !Array.isArray(words)) return res.status(400).json({ error: 'title and words[] required' })
+  const setKind = kind === 'verb' ? 'verb' : 'vocab'
 
   const client = await pool.connect()
   try {
     await client.query('BEGIN')
     const {
       rows: [wordSet],
-    } = await client.query(`INSERT INTO word_sets (title, created_at) VALUES ($1, $2) RETURNING id`, [
-      title,
-      Date.now(),
-    ])
+    } = await client.query(
+      `INSERT INTO word_sets (title, kind, created_at) VALUES ($1, $2, $3) RETURNING id`,
+      [title, setKind, Date.now()],
+    )
     for (const w of words) {
       await client.query(
-        `INSERT INTO words (word_set_id, term, meaning, is_idiom, part_of_speech) VALUES ($1, $2, $3, $4, $5)`,
-        [wordSet.id, w.term, w.meaning, !!w.isIdiom, w.partOfSpeech ?? null],
+        `INSERT INTO words (word_set_id, term, meaning, is_idiom, part_of_speech, past, participle)
+         VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+        [wordSet.id, w.term, w.meaning, !!w.isIdiom, w.partOfSpeech ?? null, w.past ?? null, w.participle ?? null],
       )
     }
     await client.query('COMMIT')
