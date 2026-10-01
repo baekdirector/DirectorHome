@@ -169,6 +169,17 @@ export function ClockIcon(props: IconProps) {
   )
 }
 
+/** 숙제 관리(클립보드). 홈 헤더에서 /admin으로 가는 버튼에 쓴다. */
+export function ClipboardIcon(props: IconProps) {
+  return (
+    <svg {...base(props)}>
+      <path d="M9 4h6v3H9z" />
+      <path d="M9 5.5H7a1 1 0 0 0-1 1V19a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1V6.5a1 1 0 0 0-1-1h-2" />
+      <path d="M9 12.5l2 2 4-4" />
+    </svg>
+  )
+}
+
 export function HomeIcon(props: IconProps) {
   return (
     <svg {...base(props)}>

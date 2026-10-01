@@ -1,11 +1,13 @@
 import { useEffect, useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
-import { BookIcon, ChevronRightIcon, PencilIcon, PlusIcon } from '../components/icons'
+import { BookIcon, PencilIcon, PlusIcon, TrashIcon } from '../components/icons'
 import { BottomNav } from '../components/BottomNav'
+import { ConfirmDialog } from '../components/ConfirmDialog'
 import { Loading, Spinner } from '../components/Loading'
-import { getWordSetAttemptCounts, getWordSets, updateWordSetTitle } from '../lib/db'
+import { deleteWordSet, getWordSetAttemptCounts, getWordSets, updateWordSetTitle } from '../lib/db'
 import { loadWordSetsCache, saveWordSetsCache, type WordSetItem } from '../lib/wordSetsCache'
 import { useSlowLoading } from '../lib/useSlowLoading'
+import { useProtectedAction } from '../lib/useProtectedAction'
 
 export function WordSets() {
   // 단어장을 막 저장하고 넘어온 경우 그 단어장을 표시한다.
@@ -17,7 +19,11 @@ export function WordSets() {
   const [draftTitle, setDraftTitle] = useState('')
   const [error, setError] = useState('')
   const [attemptCounts, setAttemptCounts] = useState<Map<number, number>>(new Map())
+  const [pendingDelete, setPendingDelete] = useState<WordSetItem | null>(null)
+  const [deleting, setDeleting] = useState(false)
   const slow = useSlowLoading(refreshing && sets !== null)
+  // 이름 수정과 삭제는 비밀번호 뒤에 둔다. 아무나 아이 단어장을 바꾸지 못하게.
+  const { run: runProtected, dialog: passwordDialog } = useProtectedAction()
 
   useEffect(() => {
     getWordSets()
@@ -31,6 +37,25 @@ export function WordSets() {
       .then((rows) => setAttemptCounts(new Map(rows.map((r) => [r.wordSetId, r.count]))))
       .catch(() => {})
   }, [])
+
+  async function confirmDelete() {
+    const target = pendingDelete
+    if (!target || deleting) return
+    setDeleting(true)
+    setError('')
+    try {
+      await deleteWordSet(target.id)
+      const next = (sets ?? []).filter((s) => s.id !== target.id)
+      setSets(next)
+      saveWordSetsCache(next)
+      setPendingDelete(null)
+    } catch {
+      setError('단어장을 지우지 못했어요. 잠시 후 다시 시도해주세요.')
+      setPendingDelete(null)
+    } finally {
+      setDeleting(false)
+    }
+  }
 
   function startEditing(set: WordSetItem) {
     setEditingId(set.id)
@@ -99,7 +124,7 @@ export function WordSets() {
                     className="flex min-w-0 flex-1 items-center gap-2"
                     onSubmit={(e) => {
                       e.preventDefault()
-                      commitRename(s)
+                      runProtected(() => void commitRename(s))
                     }}
                   >
                     <input
@@ -132,31 +157,40 @@ export function WordSets() {
                         <BookIcon width={20} height={20} className="text-primary" strokeWidth={1.8} />
                       </div>
                       <div className="min-w-0 flex-1">
-                        <div className="flex min-w-0 items-center gap-1.5">
-                          <span className="truncate text-[15.5px] font-bold">{s.title}</span>
+                        {/* 수정·삭제 버튼이 오른쪽을 차지하므로 제목은 한 줄을 통째로 쓴다.
+                            배지를 제목 옆에 두면 좁은 화면에서 제목이 "동사 3단…"으로 잘린다. */}
+                        <div className="truncate text-[15.5px] font-bold">{s.title}</div>
+                        <div className="mt-0.5 flex flex-wrap items-center gap-x-1.5 text-[12.5px] text-ink-muted">
                           {s.kind === 'verb' && (
-                            <span className="flex-none rounded-full bg-accent-tint px-2 py-0.5 text-[11px] font-bold text-accent-dark">
+                            <span className="rounded-full bg-accent-tint px-1.5 py-0.5 text-[10.5px] font-bold text-accent-dark">
                               3단변화
                             </span>
                           )}
-                        </div>
-                        <div className="mt-0.5 text-[12.5px] text-ink-muted">
-                          단어 {s.count}개 · {new Date(s.createdAt).toLocaleDateString('ko-KR')}
-                          {(attemptCounts.get(s.id) ?? 0) > 0 && ` · 테스트 ${attemptCounts.get(s.id)}회 완료`}
+                          <span>
+                            단어 {s.count}개 · {new Date(s.createdAt).toLocaleDateString('ko-KR')}
+                            {(attemptCounts.get(s.id) ?? 0) > 0 && ` · 테스트 ${attemptCounts.get(s.id)}회 완료`}
+                          </span>
                         </div>
                         {s.id === savedId && (
                           <div className="mt-0.5 text-[12.5px] font-bold text-primary">방금 저장했어요</div>
                         )}
                       </div>
-                      <ChevronRightIcon width={18} height={18} className="flex-none text-ink-muted" />
                     </Link>
                     <button
                       type="button"
                       aria-label={`${s.title} 이름 변경`}
                       onClick={() => startEditing(s)}
-                      className="flex h-9 w-9 flex-none items-center justify-center rounded-[10px] bg-surface-alt text-ink-muted"
+                      className="flex h-8 w-8 flex-none items-center justify-center rounded-[10px] bg-surface-alt text-ink-muted"
                     >
                       <PencilIcon width={15} height={15} />
+                    </button>
+                    <button
+                      type="button"
+                      aria-label={`${s.title} 삭제`}
+                      onClick={() => runProtected(() => setPendingDelete(s))}
+                      className="flex h-8 w-8 flex-none items-center justify-center rounded-[10px] bg-surface-alt text-error"
+                    >
+                      <TrashIcon width={15} height={15} />
                     </button>
                   </>
                 )}
@@ -166,6 +200,20 @@ export function WordSets() {
         </div>
       </div>
       <BottomNav />
+      <ConfirmDialog
+        open={pendingDelete !== null}
+        title="단어장을 지울까요?"
+        description={
+          pendingDelete
+            ? `"${pendingDelete.title}"와 단어 ${pendingDelete.count}개가 사라져요. 지난 테스트 결과는 그대로 남아요.`
+            : ''
+        }
+        confirmLabel={deleting ? '지우는 중...' : '지우기'}
+        danger
+        onConfirm={confirmDelete}
+        onCancel={() => setPendingDelete(null)}
+      />
+      {passwordDialog}
     </div>
   )
 }

@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import { AppDrawer } from '../components/AppDrawer'
 import { BottomNav } from '../components/BottomNav'
 import { Spinner } from '../components/Loading'
-import { BookIcon, ChartIcon, ChevronRightIcon, CheckCircleIcon, PencilIcon, StarIcon, XCircleIcon } from '../components/icons'
+import { BookIcon, ChartIcon, ChevronRightIcon, CheckCircleIcon, ClipboardIcon, PencilIcon, StarIcon, XCircleIcon } from '../components/icons'
 import { getHomeStats, getPendingHomework, type HomeStats, type PendingHomework } from '../lib/db'
 import { HomeworkCard } from '../components/HomeworkCard'
 import { localDateString } from '../lib/homework'
@@ -71,13 +71,22 @@ export function Home() {
             <img src="/icons/icon-192.png" alt="" width={36} height={36} className="h-9 w-9 rounded-[10px]" />
             <span className="font-display text-[19px] font-bold">JunsVoca</span>
           </button>
-          <Link
-            to="/parent"
-            aria-label="부모 결과 리포트 보기"
-            className="flex h-10 w-10 items-center justify-center rounded-full border border-border bg-surface text-primary"
-          >
-            <ChartIcon width={20} height={20} />
-          </Link>
+          <div className="flex items-center gap-2">
+            <Link
+              to="/admin"
+              aria-label="숙제 관리"
+              className="flex h-10 w-10 items-center justify-center rounded-full border border-border bg-surface text-primary"
+            >
+              <ClipboardIcon width={20} height={20} />
+            </Link>
+            <Link
+              to="/parent"
+              aria-label="부모 결과 리포트 보기"
+              className="flex h-10 w-10 items-center justify-center rounded-full border border-border bg-surface text-primary"
+            >
+              <ChartIcon width={20} height={20} />
+            </Link>
+          </div>
         </div>
 
         <div className="pt-6">

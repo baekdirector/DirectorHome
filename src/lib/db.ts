@@ -110,6 +110,11 @@ export function updateWord(id: number, patch: Partial<Omit<WordRecord, 'id' | 'w
   return api(`/words/${id}`, { method: 'PATCH', body: JSON.stringify(patch) })
 }
 
+/** 단어와 그 단어의 오답 노트는 함께 사라지고, 시험 기록은 남는다. */
+export function deleteWordSet(id: number): Promise<void> {
+  return api(`/wordsets/${id}`, { method: 'DELETE' })
+}
+
 export function deleteWord(id: number): Promise<void> {
   return api(`/words/${id}`, { method: 'DELETE' })
 }

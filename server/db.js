@@ -73,6 +73,13 @@ export async function migrate() {
     -- 오답 노트 테스트는 여러 단어장의 단어가 섞이므로 특정 단어장에 속하지 않는다.
     ALTER TABLE quiz_sessions ALTER COLUMN word_set_id DROP NOT NULL;
 
+    -- 단어장을 지워도 그 단어장으로 본 시험 기록은 남긴다. 기본값인 CASCADE면 단어장
+    -- 하나를 지울 때 몇 달치 성적이 통째로 사라진다. 기록에는 단어장 이름이 글자로
+    -- 들어 있어(word_set_title) 연결이 끊겨도 화면에는 그대로 보인다.
+    ALTER TABLE quiz_sessions DROP CONSTRAINT IF EXISTS quiz_sessions_word_set_id_fkey;
+    ALTER TABLE quiz_sessions ADD CONSTRAINT quiz_sessions_word_set_id_fkey
+      FOREIGN KEY (word_set_id) REFERENCES word_sets(id) ON DELETE SET NULL;
+
     CREATE INDEX IF NOT EXISTS idx_words_word_set_id ON words(word_set_id);
     CREATE INDEX IF NOT EXISTS idx_quiz_sessions_group_id ON quiz_sessions(group_id);
     CREATE INDEX IF NOT EXISTS idx_quiz_sessions_started_at ON quiz_sessions(started_at);

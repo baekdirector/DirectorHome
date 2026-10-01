@@ -147,3 +147,79 @@ describe.skipIf(!hasDb)('숙제 라우트', () => {
     expect(body.overdue.every((h) => h.completedAt === null)).toBe(true)
   })
 })
+
+describe.skipIf(!hasDb)('단어장 삭제', () => {
+  let server
+  let baseUrl
+
+  const call = async (path, init) => {
+    const res = await fetch(`${baseUrl}${path}`, {
+      headers: init?.body ? { 'Content-Type': 'application/json' } : undefined,
+      ...init,
+    })
+    return { status: res.status, body: res.status === 204 ? null : await res.json() }
+  }
+
+  beforeAll(async () => {
+    const app = express()
+    app.use(express.json())
+    app.use('/api', router)
+    await new Promise((resolve) => {
+      server = app.listen(0, () => {
+        baseUrl = `http://localhost:${server.address().port}/api`
+        resolve()
+      })
+    })
+  })
+
+  afterAll(() => new Promise((resolve) => server.close(resolve)))
+
+  it('단어장을 지워도 그 단어장으로 본 시험 기록은 남는다', async () => {
+    const { body: created } = await call('/wordsets', {
+      method: 'POST',
+      body: JSON.stringify({
+        title: '삭제 테스트 단어장',
+        words: [{ term: 'apple', meaning: '사과', isIdiom: false }],
+      }),
+    })
+    const setId = created.id
+    const { body: words } = await call(`/wordsets/${setId}/words`)
+    const groupId = `delete-test-${Date.now()}`
+
+    await call('/quiz-rounds', {
+      method: 'POST',
+      body: JSON.stringify({
+        groupId,
+        wordSetId: setId,
+        wordSetTitle: '삭제 테스트 단어장',
+        round: 1,
+        startedAt: Date.now() - 1000,
+        finishedAt: Date.now(),
+        answers: [
+          {
+            wordId: words[0].id,
+            questionType: 'spelling',
+            term: 'apple',
+            meaning: '사과',
+            correctAnswer: 'apple',
+            userAnswer: 'aple',
+            correct: false,
+          },
+        ],
+      }),
+    })
+
+    const { status } = await call(`/wordsets/${setId}`, { method: 'DELETE' })
+    expect(status).toBe(200)
+
+    // 단어장과 단어는 사라진다
+    const gone = await call(`/wordsets/${setId}`)
+    expect(gone.status).toBe(404)
+
+    // 시험 기록은 남고, 단어장 이름이 글자로 들어 있어 화면에 그대로 보인다
+    const { body: detail } = await call(`/attempts/${groupId}`)
+    expect(detail.rounds).toHaveLength(1)
+    expect(detail.rounds[0].wordSetTitle).toBe('삭제 테스트 단어장')
+    expect(detail.rounds[0].wordSetId).toBeNull()
+  })
+})

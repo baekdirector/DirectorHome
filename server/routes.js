@@ -129,6 +129,14 @@ router.get('/wordsets/:id', async (req, res) => {
   res.json(rows[0])
 })
 
+// 단어와 그 단어의 오답 노트는 함께 사라지고(CASCADE), 시험 기록은 남는다(SET NULL).
+router.delete('/wordsets/:id', async (req, res) => {
+  if (!/^\d+$/.test(req.params.id)) return res.status(400).json({ error: 'invalid id' })
+  const { rowCount } = await pool.query(`DELETE FROM word_sets WHERE id = $1`, [req.params.id])
+  if (rowCount === 0) return res.status(404).json({ error: 'not found' })
+  res.json({ ok: true })
+})
+
 router.get('/wordsets/:id/words', async (req, res) => {
   const { rows } = await pool.query(
     `SELECT id, word_set_id AS "wordSetId", term, meaning, is_idiom AS "isIdiom",

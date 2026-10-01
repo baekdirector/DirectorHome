@@ -17,6 +17,7 @@ import {
 import type { ParsedWord } from '../lib/parseWords'
 import type { ParsedVerb } from '../lib/verbs'
 import { clearWordSetsCache } from '../lib/wordSetsCache'
+import { useProtectedAction } from '../lib/useProtectedAction'
 
 type Kind = 'vocab' | 'verb'
 
@@ -84,6 +85,8 @@ export function WordReview() {
   const [pending, setPending] = useState(0)
   const [syncError, setSyncError] = useState('')
   const savingRef = useRef(false)
+  // 저장과 삭제는 비밀번호 뒤에 둔다. 아무나 아이 단어장을 바꾸지 못하게.
+  const { run: runProtected, dialog: passwordDialog } = useProtectedAction()
 
   useEffect(() => {
     if (!isExisting) return
@@ -289,7 +292,7 @@ export function WordReview() {
             <button
               type="button"
               aria-label="삭제"
-              onClick={() => removeRow(row)}
+              onClick={() => runProtected(() => void removeRow(row))}
               className="flex h-8 w-8 flex-none items-center justify-center rounded-[10px] bg-surface-alt text-error"
             >
               <TrashIcon width={15} height={15} />
@@ -329,7 +332,7 @@ export function WordReview() {
             <button
               type="button"
               disabled={validCount === 0 || saving}
-              onClick={save}
+              onClick={() => runProtected(() => void save())}
               className="rounded-2xl bg-primary p-[15px] text-center text-[15.5px] font-bold text-white disabled:opacity-40"
             >
               {saving ? '저장 중...' : '저장하기'}
@@ -338,6 +341,7 @@ export function WordReview() {
         )}
       </div>
       <BlockingOverlay open={saving} message="단어장을 저장하고 있어요..." />
+      {passwordDialog}
     </div>
   )
 }
