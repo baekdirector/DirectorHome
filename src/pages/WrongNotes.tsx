@@ -78,7 +78,9 @@ export function WrongNotes() {
               <div key={n.wordId} className="flex items-center gap-3 rounded-2xl border border-border bg-surface p-3.5">
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2">
-                    <span className="break-words font-display text-[19px] font-bold">{n.term}</span>
+                    <span className="break-words font-display text-[19px] font-bold">
+                      {n.past ? `${n.term} · ${n.past} · ${n.participle}` : n.term}
+                    </span>
                     {n.isIdiom && (
                       <span className="flex-none rounded-md bg-accent-tint px-1.5 py-0.5 text-[10px] font-bold text-accent-dark">
                         숙어

@@ -313,6 +313,7 @@ router.get('/missed-words', async (req, res) => {
 router.get('/wrong-notes', async (_req, res) => {
   const { rows } = await pool.query(`
     SELECT n.word_id AS "wordId", w.term, w.meaning, w.is_idiom AS "isIdiom", w.part_of_speech AS "partOfSpeech",
+           w.past, w.participle,
            w.word_set_id AS "wordSetId", ws.title AS "wordSetTitle",
            n.wrong_count AS "wrongCount", n.last_wrong_at AS "lastWrongAt", n.resolved_at AS "resolvedAt"
     FROM wrong_notes n

@@ -176,6 +176,9 @@ export interface WrongNote {
   meaning: string
   isIdiom: boolean
   partOfSpeech: string | null
+  /** 동사 단어장의 단어만 채워진다. 오답 노트 시험도 세 칸 문제로 내야 해서 함께 받는다. */
+  past: string | null
+  participle: string | null
   wordSetId: number
   wordSetTitle: string
   wrongCount: number

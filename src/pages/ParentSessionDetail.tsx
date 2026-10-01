@@ -105,9 +105,17 @@ export function ParentSessionDetail() {
                 <tr key={a.id} className={a.correct ? 'bg-success-tint' : 'bg-error-tint'}>
                   <td className="px-0.5 py-2 text-center text-[11.5px] text-ink-muted">{i + 1}</td>
                   <td className="break-words px-1.5 py-2 font-display text-[12.5px] font-bold">{a.term}</td>
-                  <td className="break-words px-0.5 py-2 text-[12px]">{a.correctAnswer}</td>
+                  <td className="break-words px-0.5 py-2 text-[12px]">
+                    {a.questionType === 'verb' ? <AnswerCells value={a.correctAnswer} /> : a.correctAnswer}
+                  </td>
                   <td className={`break-words px-0.5 py-2 text-[12px] ${a.correct ? '' : 'text-error'}`}>
-                    {!a.correct ? a.userAnswer || '(건너뜀)' : a.userAnswer}
+                    {a.questionType === 'verb' ? (
+                      <AnswerCells value={a.userAnswer} />
+                    ) : !a.correct ? (
+                      a.userAnswer || '(건너뜀)'
+                    ) : (
+                      a.userAnswer
+                    )}
                   </td>
                   <td className="px-1 py-2 text-center">
                     {a.correct ? (
@@ -134,6 +142,27 @@ export function ParentSessionDetail() {
         )}
       </div>
     </div>
+  )
+}
+
+const VERB_LABELS = ['현재', '과거', '과거분사']
+
+/**
+ * 동사 3단변화 답안("현재 | 과거 | 과거분사")을 칸별로 보여준다.
+ * 세 조각으로 갈라지지 않는 옛 기록은 저장된 문자열 그대로 둔다.
+ */
+function AnswerCells({ value }: { value: string }) {
+  const parts = value.split(' | ')
+  if (parts.length !== 3) return <>{value || '(건너뜀)'}</>
+  return (
+    <span className="inline-flex flex-col gap-0.5">
+      {parts.map((p, i) => (
+        <span key={i} className="break-words">
+          <span className="text-[10.5px] text-ink-muted">{VERB_LABELS[i]} </span>
+          {p.trim() === '' ? '—' : p}
+        </span>
+      ))}
+    </span>
   )
 }
 

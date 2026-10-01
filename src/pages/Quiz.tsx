@@ -161,6 +161,8 @@ export function Quiz() {
             meaning: n.meaning,
             isIdiom: n.isIdiom,
             partOfSpeech: n.partOfSpeech ?? undefined,
+            past: n.past,
+            participle: n.participle,
           }))
         } else {
           const loaded = await Promise.all(
