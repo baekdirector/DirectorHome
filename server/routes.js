@@ -121,9 +121,10 @@ router.get('/wordsets/attempt-counts', async (_req, res) => {
 })
 
 router.get('/wordsets/:id', async (req, res) => {
-  const { rows } = await pool.query(`SELECT id, title, created_at AS "createdAt" FROM word_sets WHERE id = $1`, [
-    req.params.id,
-  ])
+  const { rows } = await pool.query(
+    `SELECT id, title, kind, created_at AS "createdAt" FROM word_sets WHERE id = $1`,
+    [req.params.id],
+  )
   if (!rows[0]) return res.status(404).json({ error: 'not found' })
   res.json(rows[0])
 })
@@ -178,26 +179,29 @@ router.patch('/wordsets/:id', async (req, res) => {
 // ---- words ----
 
 router.post('/words', async (req, res) => {
-  const { wordSetId, term, meaning, isIdiom, partOfSpeech } = req.body
+  const { wordSetId, term, meaning, isIdiom, partOfSpeech, past, participle } = req.body
   const {
     rows: [row],
   } = await pool.query(
-    `INSERT INTO words (word_set_id, term, meaning, is_idiom, part_of_speech) VALUES ($1, $2, $3, $4, $5) RETURNING id`,
-    [wordSetId, term ?? '', meaning ?? '', !!isIdiom, partOfSpeech ?? null],
+    `INSERT INTO words (word_set_id, term, meaning, is_idiom, part_of_speech, past, participle)
+     VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id`,
+    [wordSetId, term ?? '', meaning ?? '', !!isIdiom, partOfSpeech ?? null, past ?? null, participle ?? null],
   )
   res.json({ id: row.id })
 })
 
 router.patch('/words/:id', async (req, res) => {
-  const { term, meaning, isIdiom, partOfSpeech } = req.body
+  const { term, meaning, isIdiom, partOfSpeech, past, participle } = req.body
   await pool.query(
     `UPDATE words SET
        term = COALESCE($1, term),
        meaning = COALESCE($2, meaning),
        is_idiom = COALESCE($3, is_idiom),
-       part_of_speech = COALESCE($4, part_of_speech)
-     WHERE id = $5`,
-    [term, meaning, isIdiom, partOfSpeech, req.params.id],
+       part_of_speech = COALESCE($4, part_of_speech),
+       past = COALESCE($5, past),
+       participle = COALESCE($6, participle)
+     WHERE id = $7`,
+    [term, meaning, isIdiom, partOfSpeech, past, participle, req.params.id],
   )
   res.json({ ok: true })
 })

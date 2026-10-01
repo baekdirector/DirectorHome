@@ -2,13 +2,20 @@ import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ArrowLeftIcon, CheckCircleIcon } from '../components/icons'
 import { parseWordsDetailed } from '../lib/parseWords'
+import { parseVerbsDetailed } from '../lib/verbs'
 
 const DRAFT_KEY = 'junsvoca_draft_words'
+
+type Kind = 'vocab' | 'verb'
 
 const PLACEHOLDER = `1 festival 축제
 2 national holiday 국경일
 3 celebrate 기념하다
 4 flea market 벼룩시장`
+
+const VERB_PLACEHOLDER = `1 come came come 오다
+2 go went gone 가다
+3 be was/were been 이다, 있다`
 
 function defaultTitle() {
   const d = new Date()
@@ -36,8 +43,13 @@ export function TextInput() {
   const navigate = useNavigate()
   const [text, setText] = useState(loadDraft)
   const [title, setTitle] = useState(defaultTitle)
+  const [kind, setKind] = useState<Kind>('vocab')
 
-  const { words, skipped } = useMemo(() => parseWordsDetailed(text), [text])
+  const vocab = useMemo(() => parseWordsDetailed(text), [text])
+  const verb = useMemo(() => parseVerbsDetailed(text), [text])
+  const isVerb = kind === 'verb'
+  const count = isVerb ? verb.verbs.length : vocab.words.length
+  const skipped = isVerb ? verb.skipped : vocab.skipped
 
   function handleChange(value: string) {
     setText(value)
@@ -46,7 +58,14 @@ export function TextInput() {
 
   function goToReview() {
     saveDraft('')
-    navigate('/wordsets/review', { state: { words, title: title.trim() || defaultTitle() } })
+    navigate('/wordsets/review', {
+      state: {
+        kind,
+        words: vocab.words,
+        verbs: verb.verbs,
+        title: title.trim() || defaultTitle(),
+      },
+    })
   }
 
   return (
@@ -74,16 +93,43 @@ export function TextInput() {
           />
         </label>
 
+        <div className="grid grid-cols-2 gap-1 rounded-2xl bg-surface-alt p-1">
+          {(['vocab', 'verb'] as const).map((k) => (
+            <button
+              key={k}
+              type="button"
+              onClick={() => setKind(k)}
+              aria-pressed={kind === k}
+              className={`h-10 rounded-xl text-[14px] font-semibold ${
+                kind === k ? 'bg-surface text-primary shadow-sm' : 'text-ink-muted'
+              }`}
+            >
+              {k === 'vocab' ? '일반 단어' : '동사 3단변화'}
+            </button>
+          ))}
+        </div>
+
         <div>
           <p className="m-0 text-[13px] leading-relaxed text-ink-muted">
-            한 줄에 단어 하나씩 <b className="text-ink">번호 · 영단어 · 뜻</b> 순서로 입력하세요.
-            <br />
-            번호는 없어도 되고, 메모장이나 엑셀에서 붙여넣어도 돼요.
+            {isVerb ? (
+              <>
+                한 줄에 하나씩 <b className="text-ink">번호 · 현재형 · 과거형 · 과거분사형 · 뜻</b>{' '}
+                순서로 입력하세요.
+                <br />
+                번호는 없어도 되고, 뜻에 띄어쓰기나 쉼표가 있어도 괜찮아요. 예) come came come 오다
+              </>
+            ) : (
+              <>
+                한 줄에 단어 하나씩 <b className="text-ink">번호 · 영단어 · 뜻</b> 순서로 입력하세요.
+                <br />
+                번호는 없어도 되고, 메모장이나 엑셀에서 붙여넣어도 돼요.
+              </>
+            )}
           </p>
           <textarea
             value={text}
             onChange={(e) => handleChange(e.target.value)}
-            placeholder={PLACEHOLDER}
+            placeholder={isVerb ? VERB_PLACEHOLDER : PLACEHOLDER}
             rows={9}
             spellCheck={false}
             autoCapitalize="none"
@@ -94,31 +140,46 @@ export function TextInput() {
 
         <div>
           <div className="flex items-center gap-1.5 text-[13px] text-ink-muted">
-            <CheckCircleIcon width={15} height={15} className={words.length > 0 ? 'text-success' : ''} />
+            <CheckCircleIcon width={15} height={15} className={count > 0 ? 'text-success' : ''} />
             <span>
-              인식된 단어 <b className="text-ink">{words.length}개</b>
+              {isVerb ? '인식된 동사' : '인식된 단어'} <b className="text-ink">{count}개</b>
             </span>
           </div>
 
-          {words.length > 0 && (
+          {count > 0 && (
             <ol className="m-0 mt-2 max-h-[280px] list-none overflow-y-auto rounded-2xl border border-border bg-surface p-0">
-              {words.map((w, i) => (
-                <li
-                  key={w.term}
-                  className="grid grid-cols-[1.5rem_minmax(0,1fr)_minmax(0,1fr)] items-baseline gap-2 border-b border-border px-3 py-2 last:border-b-0"
-                >
-                  <span className="text-xs text-ink-muted">{i + 1}</span>
-                  <span className="break-words font-display text-[16.5px] font-bold">
-                    {w.term}
-                    {w.isIdiom && (
-                      <span className="ml-1.5 rounded-md bg-accent-tint px-1.5 py-0.5 align-middle font-kr text-[10px] font-bold text-accent-dark">
-                        숙어
+              {isVerb
+                ? verb.verbs.map((v, i) => (
+                    <li
+                      key={v.term}
+                      className="grid grid-cols-[1.5rem_minmax(0,1fr)] gap-2 border-b border-border px-3 py-2 last:border-b-0"
+                    >
+                      <span className="text-xs text-ink-muted">{i + 1}</span>
+                      <div className="min-w-0">
+                        <div className="break-words font-display text-[15.5px] font-bold">
+                          {v.term} · {v.past} · {v.participle}
+                        </div>
+                        <div className="break-words text-[12.5px] text-ink-muted">{v.meaning}</div>
+                      </div>
+                    </li>
+                  ))
+                : vocab.words.map((w, i) => (
+                    <li
+                      key={w.term}
+                      className="grid grid-cols-[1.5rem_minmax(0,1fr)_minmax(0,1fr)] items-baseline gap-2 border-b border-border px-3 py-2 last:border-b-0"
+                    >
+                      <span className="text-xs text-ink-muted">{i + 1}</span>
+                      <span className="break-words font-display text-[16.5px] font-bold">
+                        {w.term}
+                        {w.isIdiom && (
+                          <span className="ml-1.5 rounded-md bg-accent-tint px-1.5 py-0.5 align-middle font-kr text-[10px] font-bold text-accent-dark">
+                            숙어
+                          </span>
+                        )}
                       </span>
-                    )}
-                  </span>
-                  <span className="break-words text-[13px]">{w.meaning}</span>
-                </li>
-              ))}
+                      <span className="break-words text-[13px]">{w.meaning}</span>
+                    </li>
+                  ))}
             </ol>
           )}
         </div>
@@ -126,10 +187,12 @@ export function TextInput() {
         {skipped.length > 0 && (
           <div className="rounded-2xl border border-error/40 bg-error-tint p-3.5">
             <p className="m-0 text-[13px] font-bold text-error">
-              {skipped.length}줄은 단어로 읽지 못해서 빠졌어요
+              {skipped.length}줄은 {isVerb ? '동사로' : '단어로'} 읽지 못해서 빠졌어요
             </p>
             <p className="m-0 mt-0.5 text-[12px] text-ink-muted">
-              영단어와 한글 뜻이 모두 있는지, 같은 단어가 두 번 들어가지 않았는지 확인해주세요.
+              {isVerb
+                ? '현재형·과거형·과거분사형과 한글 뜻이 모두 있는지, 같은 동사가 두 번 들어가지 않았는지 확인해주세요.'
+                : '영단어와 한글 뜻이 모두 있는지, 같은 단어가 두 번 들어가지 않았는지 확인해주세요.'}
             </p>
             <ul className="m-0 mt-2 list-disc break-words pl-4 text-[12.5px]">
               {skipped.map((line, i) => (
@@ -143,11 +206,13 @@ export function TextInput() {
       <div className="flex flex-none flex-col gap-2 border-t border-border bg-surface px-[22px] pb-5 pt-3.5">
         <button
           type="button"
-          disabled={words.length === 0}
+          disabled={count === 0}
           onClick={goToReview}
           className="rounded-2xl bg-primary p-[15px] text-center text-[15.5px] font-bold text-white disabled:opacity-40"
         >
-          {words.length > 0 ? `단어 ${words.length}개 확인하러 가기` : '단어를 입력해주세요'}
+          {count > 0
+            ? `${isVerb ? '동사' : '단어'} ${count}개 확인하러 가기`
+            : `${isVerb ? '동사를' : '단어를'} 입력해주세요`}
         </button>
       </div>
     </div>

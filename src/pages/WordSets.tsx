@@ -132,7 +132,14 @@ export function WordSets() {
                         <BookIcon width={20} height={20} className="text-primary" strokeWidth={1.8} />
                       </div>
                       <div className="min-w-0 flex-1">
-                        <div className="truncate text-[15.5px] font-bold">{s.title}</div>
+                        <div className="flex min-w-0 items-center gap-1.5">
+                          <span className="truncate text-[15.5px] font-bold">{s.title}</span>
+                          {s.kind === 'verb' && (
+                            <span className="flex-none rounded-full bg-accent-tint px-2 py-0.5 text-[11px] font-bold text-accent-dark">
+                              3단변화
+                            </span>
+                          )}
+                        </div>
                         <div className="mt-0.5 text-[12.5px] text-ink-muted">
                           단어 {s.count}개 · {new Date(s.createdAt).toLocaleDateString('ko-KR')}
                           {(attemptCounts.get(s.id) ?? 0) > 0 && ` · 테스트 ${attemptCounts.get(s.id)}회 완료`}
