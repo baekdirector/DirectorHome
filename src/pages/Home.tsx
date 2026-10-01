@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { AppDrawer } from '../components/AppDrawer'
 import { BottomNav } from '../components/BottomNav'
@@ -9,8 +9,9 @@ import { HomeworkCard } from '../components/HomeworkCard'
 import { localDateString } from '../lib/homework'
 import { useSlowLoading } from '../lib/useSlowLoading'
 
-function todayLabel() {
-  const d = new Date()
+function todayLabel(date: string) {
+  const [y, m, day] = date.split('-').map(Number)
+  const d = new Date(y, m - 1, day)
   const days = ['일', '월', '화', '수', '목', '금', '토']
   return `${d.getMonth() + 1}월 ${d.getDate()}일 ${days[d.getDay()]}요일`
 }
@@ -20,7 +21,7 @@ export function Home() {
   const [statsFailed, setStatsFailed] = useState(false)
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [homework, setHomework] = useState<PendingHomework | null>(null)
-  const today = useMemo(() => localDateString(), [])
+  const [today, setToday] = useState(localDateString)
 
   useEffect(() => {
     getHomeStats()
@@ -34,6 +35,24 @@ export function Home() {
       // 숙제는 홈의 일부일 뿐이다. 못 불러와도 통계·오답노트·단어장은 보여준다.
       .catch(() => setHomework({ today: [], overdue: [] }))
   }, [today])
+
+  // 홈 화면을 띄워 둔 채 자정을 넘기면(설치형 앱에서는 흔하다) 어제 숙제가 "오늘의 숙제"로
+  // 남는다. 화면으로 돌아올 때마다 날짜를 다시 재고, 바뀌었으면 위 effect가 다시 돈다.
+  useEffect(() => {
+    const recheck = () => {
+      if (document.visibilityState !== 'visible') return
+      setToday((prev) => {
+        const now = localDateString()
+        return now === prev ? prev : now
+      })
+    }
+    document.addEventListener('visibilitychange', recheck)
+    window.addEventListener('focus', recheck)
+    return () => {
+      document.removeEventListener('visibilitychange', recheck)
+      window.removeEventListener('focus', recheck)
+    }
+  }, [])
 
   // 통계가 오기 전에는 숫자 대신 스피너를 보여준다. (불러오기에 실패하면 스피너 대신 '–')
   const loadingStats = stats === null && !statsFailed
@@ -62,7 +81,7 @@ export function Home() {
         </div>
 
         <div className="pt-6">
-          <p className="m-0 text-[13px] text-ink-muted">{todayLabel()}</p>
+          <p className="m-0 text-[13px] text-ink-muted">{todayLabel(today)}</p>
           <h1 className="mt-1.5 text-[27px] font-extrabold leading-snug">
             안녕!
             <br />

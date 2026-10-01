@@ -72,6 +72,8 @@ interface RoundResult {
   isFinal: boolean
   /** 이 라운드로 숙제를 끝냈는지 */
   homeworkDone: boolean
+  /** 숙제 완료를 서버에 남기지 못했을 때의 안내. 성공했거나 숙제가 아니면 null. */
+  homeworkError: string | null
 }
 
 /** "5" 또는 "1,2,3" 같은 단어장 id 목록을 숫자 배열로. */
@@ -120,7 +122,7 @@ export function Quiz() {
   // 풀 수 있는데, 열쇠가 같으면 서로의 진행 상황을 덮어쓴다.
   const progressKey = homeworkId !== null ? `hw-${homeworkId}` : idsKey
   // 단어장 하나만 고른 경우에만 값이 있다 (이름 편집, 기록의 단어장 연결에 사용)
-  const singleId = wordSetIds?.length === 1 ? wordSetIds[0] : null
+  const urlSingleId = wordSetIds?.length === 1 ? wordSetIds[0] : null
   const navigate = useNavigate()
 
   const [phase, setPhase] = useState<Phase>('loading')
@@ -142,9 +144,15 @@ export function Quiz() {
   const [roundStartedAt, setRoundStartedAt] = useState(0)
   const [firstRound, setFirstRound] = useState<{ correct: number; total: number } | null>(null)
   const [roundResult, setRoundResult] = useState<RoundResult | null>(null)
-  // 숙제는 단어를 다 받은 뒤 설정 화면 없이 바로 시작한다. 단어와 문제 수가 상태에
-  // 들어온 다음 startQuiz를 불러야 해서 깃발을 하나 둔다.
-  const [pendingHomeworkStart, setPendingHomeworkStart] = useState(false)
+  // 숙제는 단어를 다 받은 뒤 설정 화면 없이 바로 시작한다. 값을 상태에 흩뿌리고 effect가
+  // 클로저로 읽으면 렌더 타이밍에 따라 기본값으로 출제될 수 있어, 필요한 값을 깃발에 싣는다.
+  const [pendingHomeworkStart, setPendingHomeworkStart] = useState<{
+    questionCount: number
+    /** 단어장 하나짜리 숙제면 그 id. 기록을 그 단어장에 연결한다. */
+    wordSetId: number | null
+  } | null>(null)
+  // 숙제로 들어왔을 때의 단어장 id. 응시 횟수·부모 리포트가 단어장을 알아보게 한다.
+  const [homeworkSetId, setHomeworkSetId] = useState<number | null>(null)
   const [exitDialogOpen, setExitDialogOpen] = useState(false)
   const [finishDialogOpen, setFinishDialogOpen] = useState(false)
   const [submitting, setSubmitting] = useState(false)
@@ -245,8 +253,9 @@ export function Quiz() {
         } else if (hw !== null) {
           // 숙제는 부모가 문제 수를 정했으므로 설정 화면을 건너뛴다. 순서는 늘 섞기이고
           // (order 기본값), 문제 수 0은 ALL_WORDS와 같은 값이라 "전체"로 통한다.
-          setQuestionCount(hw.questionCount)
-          setPendingHomeworkStart(true)
+          const onlySet = hw.wordSets.length === 1 ? hw.wordSets[0].id : null
+          setHomeworkSetId(onlySet)
+          setPendingHomeworkStart({ questionCount: hw.questionCount, wordSetId: onlySet })
         } else {
           setPhase('setup')
         }
@@ -392,7 +401,7 @@ export function Quiz() {
     try {
       await recordQuizRound({
         groupId,
-        wordSetId: singleId,
+        wordSetId: urlSingleId ?? homeworkSetId,
         wordSetTitle,
         round,
         // 서버는 소요 시간을 finishedAt - startedAt으로 계산하므로, 실제로 푼 시간이 나오게 맞춘다.
@@ -411,14 +420,16 @@ export function Quiz() {
 
     // 틀린 단어가 0인 라운드를 마쳤을 때만 숙제가 끝난 것이다(설계 3.4).
     let homeworkDone = false
+    let homeworkError: string | null = null
     if (homeworkId !== null && wrongAnswers.length === 0) {
       try {
         await completeHomework(homeworkId, groupId)
         homeworkDone = true
       } catch {
         // 시험 기록은 이미 저장됐다. 숙제 도장만 못 찍었으니 결과 화면은 그대로 보여주고
-        // 조용히 알린다. 다시 풀면 복구된다.
-        setSubmitError('숙제 완료를 기록하지 못했어요. 인터넷 연결을 확인해 주세요.')
+        // 조용히 알린다. 다시 풀면 복구된다. submitError는 문제 화면 전용이라 여기서는
+        // 결과에 실어 보내야 보인다.
+        homeworkError = '숙제 완료를 기록하지 못했어요. 인터넷이 연결되면 다시 풀어주세요.'
       }
     }
 
@@ -432,13 +443,14 @@ export function Quiz() {
       wrongAnswers,
       isFinal: wrongAnswers.length === 0,
       homeworkDone,
+      homeworkError,
     })
     setPhase('round-summary')
   }
 
   async function saveTitle() {
     const trimmed = wordSetTitle.trim()
-    if (singleId === null) return
+    if (urlSingleId === null) return
     if (!trimmed) {
       setWordSetTitle(savedTitleRef.current)
       return
@@ -446,7 +458,7 @@ export function Quiz() {
     setWordSetTitle(trimmed)
     if (trimmed === savedTitleRef.current) return
     try {
-      await updateWordSetTitle(singleId, trimmed)
+      await updateWordSetTitle(urlSingleId, trimmed)
       savedTitleRef.current = trimmed
       setTitleError('')
     } catch {
@@ -465,9 +477,13 @@ export function Quiz() {
   // 숙제로 들어왔으면 설정 화면을 거치지 않고 바로 출제한다. 자유 시험과 같은 startQuiz를
   // 써서 groupId 생성·라운드 초기화가 한 곳에만 있게 한다.
   useEffect(() => {
-    if (!pendingHomeworkStart || allWords.length === 0) return
-    setPendingHomeworkStart(false)
-    startQuiz()
+    if (pendingHomeworkStart === null || allWords.length === 0) return
+    const { questionCount: count } = pendingHomeworkStart
+    setPendingHomeworkStart(null)
+    setGroupId(crypto.randomUUID())
+    setFirstRound(null)
+    // 0은 "전체"다. 순서는 늘 섞기(order 기본값)라 같은 숙제를 매일 내도 날마다 다르다.
+    startRound(allWords, 1, count === 0 ? undefined : count)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pendingHomeworkStart, allWords])
 
@@ -542,7 +558,7 @@ export function Quiz() {
 
         <div className="flex flex-1 flex-col overflow-y-auto px-[22px] py-5">
           <div className="rounded-[22px] border border-border bg-surface p-5">
-            {singleId === null ? (
+            {urlSingleId === null ? (
               <div className="break-words text-[19px] font-extrabold">{wordSetTitle}</div>
             ) : (
               <label className="flex items-center gap-2">
@@ -1048,6 +1064,11 @@ function RoundSummary({
           {result.homeworkDone && (
             <span className="rounded-full bg-accent-tint px-3 py-1 text-[12.5px] font-bold text-accent-dark">
               오늘 숙제 끝!
+            </span>
+          )}
+          {result.homeworkError && (
+            <span className="rounded-2xl bg-error-tint px-3 py-2 text-[12.5px] font-semibold text-error">
+              {result.homeworkError}
             </span>
           )}
         </div>

@@ -15,11 +15,13 @@ import { dayCount, formatDueDate, localDateString, nextDate, shiftDate } from '.
 import type { WordSetItem } from '../lib/wordSetsCache'
 
 const COUNT_OPTIONS = [5, 10, 20, 0] as const
-const MAX_RANGE_DAYS = 92
 
 /** 목록에 보여줄 범위: 지난 2주 ~ 앞으로 4주. 전부 불러오면 시간이 갈수록 느려진다. */
 const PAST_DAYS = 14
 const FUTURE_DAYS = 28
+// 배정은 "배정된 숙제" 목록이 보여주는 창 안에서만 받는다. 그보다 멀리 내면 만들어는
+// 지는데 목록에 나타나지 않아 확인도 삭제도 할 수 없다(숙제 수정은 지우고 다시 내는 것뿐).
+// 서버는 92일까지 받지만 그건 사고 방지용 상한이고, 화면은 더 좁게 잡는다.
 
 export function Admin() {
   return (
@@ -61,7 +63,9 @@ function AdminBody() {
   }, [reload])
 
   const days = dayCount(fromDate, toDate)
-  const canAssign = selected.size > 0 && days > 0 && days <= MAX_RANGE_DAYS && !saving
+  const latestAllowed = shiftDate(today, FUTURE_DAYS)
+  const tooFar = toDate > latestAllowed
+  const canAssign = selected.size > 0 && days > 0 && !tooFar && !saving
 
   function toggle(id: number) {
     setSelected((prev) => {
@@ -155,6 +159,7 @@ function AdminBody() {
               type="date"
               aria-label="시작일"
               value={fromDate}
+              max={latestAllowed}
               onChange={(e) => {
                 setFromDate(e.target.value)
                 if (e.target.value > toDate) setToDate(e.target.value)
@@ -167,6 +172,7 @@ function AdminBody() {
               aria-label="종료일"
               value={toDate}
               min={fromDate}
+              max={latestAllowed}
               onChange={(e) => setToDate(e.target.value)}
               className="min-w-0 flex-1 rounded-xl border border-border bg-surface px-3 py-2.5 text-[14px] outline-none focus:border-primary"
             />
@@ -196,9 +202,10 @@ function AdminBody() {
               종료일이 시작일보다 빨라요.
             </p>
           )}
-          {days > MAX_RANGE_DAYS && (
+          {tooFar && (
             <p className="m-0 mt-2 text-[12.5px] font-semibold text-error">
-              기간은 {MAX_RANGE_DAYS}일까지만 낼 수 있어요.
+              {formatDueDate(latestAllowed)}까지만 낼 수 있어요. 그 뒤 날짜는 아래 목록에서
+              확인하거나 지울 수 없어요.
             </p>
           )}
 
