@@ -1,10 +1,12 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { AppDrawer } from '../components/AppDrawer'
 import { BottomNav } from '../components/BottomNav'
 import { Spinner } from '../components/Loading'
 import { BookIcon, ChartIcon, ChevronRightIcon, CheckCircleIcon, PencilIcon, StarIcon, XCircleIcon } from '../components/icons'
-import { getHomeStats, type HomeStats } from '../lib/db'
+import { getHomeStats, getPendingHomework, type HomeStats, type PendingHomework } from '../lib/db'
+import { HomeworkCard } from '../components/HomeworkCard'
+import { localDateString } from '../lib/homework'
 import { useSlowLoading } from '../lib/useSlowLoading'
 
 function todayLabel() {
@@ -17,12 +19,21 @@ export function Home() {
   const [stats, setStats] = useState<HomeStats | null>(null)
   const [statsFailed, setStatsFailed] = useState(false)
   const [drawerOpen, setDrawerOpen] = useState(false)
+  const [homework, setHomework] = useState<PendingHomework | null>(null)
+  const today = useMemo(() => localDateString(), [])
 
   useEffect(() => {
     getHomeStats()
       .then(setStats)
       .catch(() => setStatsFailed(true))
   }, [])
+
+  useEffect(() => {
+    getPendingHomework(today)
+      .then(setHomework)
+      // 숙제는 홈의 일부일 뿐이다. 못 불러와도 통계·오답노트·단어장은 보여준다.
+      .catch(() => setHomework({ today: [], overdue: [] }))
+  }, [today])
 
   // 통계가 오기 전에는 숫자 대신 스피너를 보여준다. (불러오기에 실패하면 스피너 대신 '–')
   const loadingStats = stats === null && !statsFailed
@@ -69,6 +80,13 @@ export function Home() {
         )}
 
         <div className="flex flex-col gap-3 pt-6">
+          {homework?.today.map((hw) => (
+            <HomeworkCard key={hw.id} homework={hw} today={today} />
+          ))}
+          {homework?.overdue.map((hw) => (
+            <HomeworkCard key={hw.id} homework={hw} today={today} />
+          ))}
+
           <Link
             to="/test"
             className="flex items-center gap-3.5 rounded-[20px] bg-primary p-4.5 shadow-[0_8px_20px_-10px_rgba(20,79,76,0.55)]"
