@@ -24,6 +24,7 @@ import {
 } from '../lib/db'
 import { checkAnswer, formatDateTime, formatDuration, generateQuestions, type Question, type QuizWord } from '../lib/quiz'
 import { VerbAnswerFields } from '../components/VerbAnswerFields'
+import { VerbAnswerCells } from '../components/VerbAnswerCells'
 import {
   checkVerbAnswer,
   joinVerbAnswer,
@@ -197,7 +198,12 @@ export function Quiz() {
           setAnswers(saved.answers)
           const resumeIndex = Math.min(saved.qIndex, saved.questions.length - 1)
           setQIndex(resumeIndex)
-          setAnswerInput(saved.answers[resumeIndex]?.userAnswer ?? '')
+          const resumeAnswer = saved.answers[resumeIndex]?.userAnswer ?? ''
+          setAnswerInput(resumeAnswer)
+          // goTo와 같은 복원. 이게 없으면 이어서 풀 때 동사 세 칸만 비어 보인다.
+          setVerbInput(
+            saved.questions[resumeIndex]?.type === 'verb' ? splitVerbAnswer(resumeAnswer) : EMPTY_VERB,
+          )
           setRound(saved.round)
           setGroupId(saved.groupId)
           setRoundStartedAt(saved.startedAt)
@@ -986,10 +992,16 @@ function RoundSummary({
             <div key={a.wordId} className="flex items-center gap-2.5 rounded-2xl border border-border bg-surface p-3">
               <div className="flex-1">
                 <div className="font-display text-[18px] font-bold">
-                  {a.term} <span className="font-kr text-[13px] font-normal text-ink-muted">= {a.meaning}</span>
+                  {a.questionType === 'verb' ? a.correctAnswer.split(' | ').join(' · ') : a.term}{' '}
+                  <span className="font-kr text-[13px] font-normal text-ink-muted">= {a.meaning}</span>
                 </div>
                 <div className="mt-1 text-[12.5px] text-error">
-                  내가 쓴 답: <span className="line-through">{a.userAnswer || '(건너뜀)'}</span>
+                  내가 쓴 답:{' '}
+                  {a.questionType === 'verb' ? (
+                    <VerbAnswerCells value={a.userAnswer} layout="row" />
+                  ) : (
+                    <span className="line-through">{a.userAnswer || '(건너뜀)'}</span>
+                  )}
                 </div>
               </div>
               <button

@@ -3,6 +3,7 @@ import { Link, useParams } from 'react-router-dom'
 import { ArrowLeftIcon, CheckIcon, InfoIcon, XIcon } from '../components/icons'
 import { getAttemptDetail, type QuizAnswerRecord, type QuizSessionRecord } from '../lib/db'
 import { LoadError } from '../components/LoadError'
+import { VerbAnswerCells } from '../components/VerbAnswerCells'
 import { Loading } from '../components/Loading'
 import { formatDateTime, formatMinSec } from '../lib/quiz'
 
@@ -106,11 +107,11 @@ export function ParentSessionDetail() {
                   <td className="px-0.5 py-2 text-center text-[11.5px] text-ink-muted">{i + 1}</td>
                   <td className="break-words px-1.5 py-2 font-display text-[12.5px] font-bold">{a.term}</td>
                   <td className="break-words px-0.5 py-2 text-[12px]">
-                    {a.questionType === 'verb' ? <AnswerCells value={a.correctAnswer} /> : a.correctAnswer}
+                    {a.questionType === 'verb' ? <VerbAnswerCells value={a.correctAnswer} /> : a.correctAnswer}
                   </td>
                   <td className={`break-words px-0.5 py-2 text-[12px] ${a.correct ? '' : 'text-error'}`}>
                     {a.questionType === 'verb' ? (
-                      <AnswerCells value={a.userAnswer} />
+                      <VerbAnswerCells value={a.userAnswer} />
                     ) : !a.correct ? (
                       a.userAnswer || '(건너뜀)'
                     ) : (
@@ -142,27 +143,6 @@ export function ParentSessionDetail() {
         )}
       </div>
     </div>
-  )
-}
-
-const VERB_LABELS = ['현재', '과거', '과거분사']
-
-/**
- * 동사 3단변화 답안("현재 | 과거 | 과거분사")을 칸별로 보여준다.
- * 세 조각으로 갈라지지 않는 옛 기록은 저장된 문자열 그대로 둔다.
- */
-function AnswerCells({ value }: { value: string }) {
-  const parts = value.split(' | ')
-  if (parts.length !== 3) return <>{value || '(건너뜀)'}</>
-  return (
-    <span className="inline-flex flex-col gap-0.5">
-      {parts.map((p, i) => (
-        <span key={i} className="break-words">
-          <span className="text-[10.5px] text-ink-muted">{VERB_LABELS[i]} </span>
-          {p.trim() === '' ? '—' : p}
-        </span>
-      ))}
-    </span>
   )
 }
 

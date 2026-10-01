@@ -10,7 +10,7 @@
 10 have had had 가지다
 11 hang hung hung 걸다
 12 hear heard heard 듣다
-13 hold held held 잡다
+13 hold held held 쥐다, 붙들다
 14 keep kept kept 유지하다
 15 kneel knelt knelt 무릎을 꿇다
 16 lay laid laid 눕히다, 놓다
@@ -35,7 +35,7 @@
 35 spill spilt spilt 엎지르다
 36 sweep swept swept 청소하다
 37 teach taught taught 가르치다
-38 tell told told 말하다
+38 tell told told 알려주다
 39 think thought thought 생각하다
 40 win won won 이기다
 41 be was/were been 이다, 있다
@@ -83,7 +83,7 @@
 83 hurt hurt hurt 다치다
 84 let let let ~하게 하다
 85 put put put 놓다
-86 set set set 놓다
+86 set set set 두다, 설치하다
 87 shut shut shut 닫다
 88 read read read 읽다
 89 become became become 되다

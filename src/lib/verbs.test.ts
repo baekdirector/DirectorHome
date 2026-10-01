@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import verbsText from '../../scripts/verbs.txt?raw'
 import {
   checkVerbAnswer,
   joinVerbAnswer,
@@ -176,5 +177,30 @@ describe('splitVerbAnswer', () => {
 
   it('모르겠어요로 넘겨 빈 문자열이 저장된 경우 세 칸 모두 빈 칸이 된다', () => {
     expect(splitVerbAnswer('')).toEqual({ present: '', past: '', participle: '' })
+  })
+})
+
+// 동사 문제는 뜻만 보여주므로(철자 시험의 첫 글자 힌트가 없다) 한 단어장 안에 뜻이 같은
+// 동사가 둘 있으면 아이가 무엇을 묻는지 알 수 없다. 맞는 답을 써도 오답이 된다.
+describe('scripts/verbs.txt 데이터', () => {
+  const lines = verbsText.split(/\r?\n/).filter((l: string) => l.trim() !== '')
+
+  it('같은 유형 단어장 안에 뜻이 겹치는 동사가 없다', () => {
+    const byPattern = new Map<string, Map<string, string[]>>()
+    for (const line of lines) {
+      const v = parseVerbLine(line)
+      if (!v) continue
+      const pattern = verbPattern(v)
+      if (!byPattern.has(pattern)) byPattern.set(pattern, new Map())
+      const byMeaning = byPattern.get(pattern)!
+      byMeaning.set(v.meaning, [...(byMeaning.get(v.meaning) ?? []), v.term])
+    }
+    const clashes: string[] = []
+    for (const [pattern, byMeaning] of byPattern) {
+      for (const [meaning, terms] of byMeaning) {
+        if (terms.length > 1) clashes.push(`${pattern} "${meaning}": ${terms.join(', ')}`)
+      }
+    }
+    expect(clashes).toEqual([])
   })
 })
