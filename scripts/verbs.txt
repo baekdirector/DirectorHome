@@ -1,0 +1,92 @@
+1 bleed bled bled 피를 흘리다
+2 bring brought brought 가져오다
+3 build built built 짓다
+4 buy bought bought 사다
+5 catch caught caught 잡다
+6 feel felt felt 느끼다
+7 fight fought fought 싸우다
+8 flee fled fled 도망치다
+9 get got got 얻다
+10 have had had 가지다
+11 hang hung hung 걸다
+12 hear heard heard 듣다
+13 hold held held 잡다
+14 keep kept kept 유지하다
+15 kneel knelt knelt 무릎을 꿇다
+16 lay laid laid 눕히다, 놓다
+17 lead led led 인도하다
+18 leave left left 떠나다
+19 lose lost lost 잃다
+20 lend lent lent 빌려주다
+21 make made made 만들다
+22 mean meant meant 의미하다
+23 meet met met 만나다
+24 pay paid paid 지불하다
+25 say said said 말하다
+26 seek sought sought 찾다
+27 sell sold sold 팔다
+28 send sent sent 보내다
+29 sleep slept slept 잠자다
+30 smell smelt smelt 냄새 맡다
+31 shine shone shone 빛나다
+32 shoot shot shot 쏘다
+33 sit sat sat 앉다
+34 spend spent spent 소비하다
+35 spill spilt spilt 엎지르다
+36 sweep swept swept 청소하다
+37 teach taught taught 가르치다
+38 tell told told 말하다
+39 think thought thought 생각하다
+40 win won won 이기다
+41 be was/were been 이다, 있다
+42 bear bore born 낳다, 견디다
+43 begin began begun 시작하다
+44 bite bit bitten 물다
+45 blow blew blown 불다
+46 break broke broken 깨뜨리다
+47 choose chose chosen 고르다
+48 do did done 하다
+49 draw drew drawn 그리다
+50 drink drank drunk 마시다
+51 drive drove driven 운전하다
+52 eat ate eaten 먹다
+53 fall fell fallen 떨어지다
+54 fly flew flown 날다
+55 forget forgot forgotten 잊다
+56 freeze froze frozen 얼다
+57 get got got/gotten 얻다
+58 give gave given 주다
+59 go went gone 가다
+60 grow grew grown 자라다
+61 hide hid hidden 숨다
+62 know knew known 알다
+63 lie lay lain 눕다
+64 ride rode ridden 타다
+65 ring rang rung 울리다
+66 rise rose risen 오르다
+67 see saw seen 보다
+68 shake shook shaken 흔들다
+69 show showed showed/shown 보여주다
+70 speak spoke spoken 말하다
+71 sing sang sung 노래하다
+72 steal stole stolen 훔치다
+73 swell swelled swelled/swollen 부풀다
+74 swim swam swum 수영하다
+75 take took taken 가져가다
+76 throw threw thrown 던지다
+77 wake woke woken 잠이 깨다
+78 wear wore worn 입다
+79 write wrote written 쓰다
+80 cost cost cost 비용이 들다
+81 cut cut cut 자르다
+82 hit hit hit 치다, 때리다
+83 hurt hurt hurt 다치다
+84 let let let ~하게 하다
+85 put put put 놓다
+86 set set set 놓다
+87 shut shut shut 닫다
+88 read read read 읽다
+89 become became become 되다
+90 come came come 오다
+91 run ran run 달리다
+92 beat beat beaten 치다
