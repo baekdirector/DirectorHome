@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import {
   currentVoices,
+  hasGenderedVoices,
   isSpeechSupported,
+  PITCH,
   loadVoices,
   pickVoice,
   speakLine,
@@ -92,7 +94,7 @@ export function useOpicPlayer(track: PlayerTrack) {
         setIndex(i)
         const text = speakableText(track.lines[i])
         if (text === '') continue
-        await speakLine(text, { voice: maleVoice, rate: rateRef.current })
+        await speakLine(text, { voice: maleVoice, rate: rateRef.current, pitch: PITCH.male })
         refreshVoices()
       }
 
@@ -112,13 +114,33 @@ export function useOpicPlayer(track: PlayerTrack) {
     setPlaying(true)
     setIndex(QUESTION_INDEX)
 
-    await speakLine(speakableText(track.question), { voice: femaleVoice, rate: rateRef.current })
+    await speakLine(speakableText(track.question), {
+      voice: femaleVoice,
+      rate: rateRef.current,
+      pitch: PITCH.female,
+    })
     refreshVoices()
 
     if (sessionRef.current !== session) return
     setPlaying(false)
     setIndex(null)
   }, [supported, track.question, femaleVoice, refreshVoices])
+
+  /** 고른 목소리를 짧게 들려준다. 적용됐는지 귀로 확인하는 용도. */
+  const preview = useCallback(
+    (gender: 'male' | 'female') => {
+      sessionRef.current += 1
+      stopSpeaking()
+      setPlaying(false)
+      setIndex(null)
+      speakLine('This is how the answer will sound.', {
+        voice: gender === 'male' ? maleVoice : femaleVoice,
+        rate: rateRef.current,
+        pitch: PITCH[gender],
+      }).then(refreshVoices)
+    },
+    [maleVoice, femaleVoice, refreshVoices],
+  )
 
   const toggle = useCallback(() => {
     if (playing) stop()
@@ -158,6 +180,8 @@ export function useOpicPlayer(track: PlayerTrack) {
     setRate,
     playing,
     index,
+    gendered: hasGenderedVoices(voices),
+    preview,
     playAnswer,
     playQuestion,
     refreshVoices,

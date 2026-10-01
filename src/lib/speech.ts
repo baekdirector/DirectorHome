@@ -48,6 +48,21 @@ export function pickVoice<T extends VoiceLike>(voices: T[], gender: VoiceGender)
   return sorted.find((v) => genderOf(v.name) === gender) ?? sorted[0]
 }
 
+/**
+ * 답변(남)과 질문(여)의 음높이.
+ * 안드로이드 기본 TTS는 언어당 음성이 하나뿐인 경우가 많아 이름으로 성별을 고를 수 없다.
+ * 그럴 때도 둘이 구분되도록 음높이를 벌려 둔다. 진짜 성별 음성이 있는 기기에서도
+ * 어색하지 않을 만큼만 움직인다.
+ */
+export const PITCH: Record<VoiceGender, number> = { male: 0.8, female: 1.15 }
+
+/** 이 기기가 성별이 다른 영어 음성을 실제로 갖고 있는지. 목록이 언어명뿐이면 false. */
+export function hasGenderedVoices(voices: VoiceLike[]): boolean {
+  const english = voices.filter((v) => v.lang?.toLowerCase().startsWith('en'))
+  const kinds = new Set(english.map((v) => genderOf(v.name)).filter(Boolean))
+  return kinds.size >= 2
+}
+
 export const isSpeechSupported = () =>
   typeof window !== 'undefined' && 'speechSynthesis' in window && 'SpeechSynthesisUtterance' in window
 
@@ -99,7 +114,7 @@ export function stopSpeaking() {
  */
 export function speakLine(
   text: string,
-  opts: { voice: SpeechSynthesisVoice | null; rate: number },
+  opts: { voice: SpeechSynthesisVoice | null; rate: number; pitch?: number },
 ): Promise<void> {
   if (!isSpeechSupported() || text.trim() === '') return Promise.resolve()
 
@@ -112,6 +127,7 @@ export function speakLine(
       u.lang = 'en-US'
     }
     u.rate = opts.rate
+    if (opts.pitch !== undefined) u.pitch = opts.pitch
     let settled = false
     const finish = () => {
       if (settled) return

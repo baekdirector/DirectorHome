@@ -29,7 +29,29 @@ export function OpicNav() {
 
   return (
     <>
-      <div className="flex items-center justify-between bg-op-bg px-5 pb-2 pt-5 text-op-ink lg:hidden">{brand}</div>
+      {/* 좁은 화면에는 사이드바가 없으므로 상단 바 아래에 같은 항목을 가로 탭으로 둔다. */}
+      <div className="flex flex-col gap-3 bg-op-bg px-5 pb-1 pt-5 text-op-ink lg:hidden">
+        {brand}
+        <nav aria-label="OPIC 메뉴" className="flex gap-1 rounded-xl bg-[#ECE8DF] p-1">
+          {TABS.map((tab) => {
+            const active = isActive(tab.to, tab.exact)
+            return (
+              <Link
+                key={tab.to}
+                to={tab.to}
+                aria-current={active ? 'page' : undefined}
+                className={`flex-1 rounded-lg py-2 text-center text-[13px] no-underline ${
+                  active
+                    ? 'bg-white font-bold text-op-ink shadow-[0_1px_3px_rgba(31,42,39,0.12)]'
+                    : 'font-medium text-op-ink-muted'
+                }`}
+              >
+                {tab.label}
+              </Link>
+            )
+          })}
+        </nav>
+      </div>
 
       <nav aria-label="주 메뉴" className="hidden w-[232px] flex-none bg-op-ink text-white lg:block">
         <div className="sticky top-0 flex flex-col gap-8 px-3.5 py-6">

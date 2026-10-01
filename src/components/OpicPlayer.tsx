@@ -2,8 +2,8 @@ import { useState } from 'react'
 import { RATES, type Rate } from '../lib/useOpicPlayer'
 
 /**
- * 스크립트 하단 재생 바. 질문은 여성, 답변은 남성 음성으로 읽는다.
- * 기기마다 실린 음성이 달라 성별 추정이 틀릴 수 있으므로 직접 고르는 자리를 함께 둔다.
+ * 스크립트 하단 재생 바. 답변을 문장 단위로 읽는다(질문은 에바 카드의 버튼이 맡는다).
+ * 기기에 실린 음성이 하나뿐인 경우가 많아, 목소리 선택과 음높이 안내를 함께 둔다.
  */
 export function OpicPlayer({
   supported,
@@ -18,8 +18,10 @@ export function OpicPlayer({
   voices,
   maleVoice,
   femaleVoice,
+  gendered,
   onVoice,
   onRefreshVoices,
+  onPreview,
 }: {
   supported: boolean
   playing: boolean
@@ -34,8 +36,11 @@ export function OpicPlayer({
   voices: SpeechSynthesisVoice[]
   maleVoice: SpeechSynthesisVoice | null
   femaleVoice: SpeechSynthesisVoice | null
+  /** 이 기기가 성별이 다른 영어 음성을 실제로 갖고 있는지. */
+  gendered: boolean
   onVoice: (gender: 'male' | 'female', name: string) => void
   onRefreshVoices: () => void
+  onPreview: (gender: 'male' | 'female') => void
 }) {
   const [showVoices, setShowVoices] = useState(false)
 
@@ -48,9 +53,10 @@ export function OpicPlayer({
   }
 
   return (
-    <div className="flex flex-col gap-2 rounded-2xl border border-op-border bg-white p-3">
+    <div className="flex flex-col gap-2.5 rounded-2xl border border-op-border bg-white p-3">
       <div className="flex items-center gap-2">
         <span className="flex-none text-[12px] font-semibold text-op-ink-muted">답변</span>
+
         <button
           type="button"
           onClick={onPrev}
@@ -103,28 +109,30 @@ export function OpicPlayer({
         <span className="flex-none tabular-nums text-[13px] text-op-ink-muted">
           {position} / {total}
         </span>
+      </div>
 
-        <div className="flex flex-none gap-1">
-          {RATES.map((r) => (
-            <button
-              key={r}
-              type="button"
-              onClick={() => onRate(r)}
-              aria-pressed={rate === r}
-              className={`h-8 rounded-lg border px-2 text-[12px] font-bold ${
-                rate === r
-                  ? 'border-op-accent bg-op-accent text-white'
-                  : 'border-op-border bg-white text-op-ink-muted'
-              }`}
-            >
-              {r}x
-            </button>
-          ))}
-        </div>
+      {/* 배속은 좁은 화면에서 위 줄에 함께 두면 화면 밖으로 밀린다. 별도 줄로 내린다. */}
+      <div className="flex items-center gap-2">
+        <span className="flex-none text-[12px] text-op-ink-muted">속도</span>
+        {RATES.map((r) => (
+          <button
+            key={r}
+            type="button"
+            onClick={() => onRate(r)}
+            aria-pressed={rate === r}
+            className={`h-8 flex-1 rounded-lg border text-[12px] font-bold ${
+              rate === r
+                ? 'border-op-accent bg-op-accent text-white'
+                : 'border-op-border bg-white text-op-ink-muted'
+            }`}
+          >
+            {r}x
+          </button>
+        ))}
       </div>
 
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1 px-1 text-[12px] text-op-ink-muted">
-        <span>답변 음성 {maleVoice?.name ?? '기기 기본'}</span>
+        <span className="truncate">답변 음성 {maleVoice?.name ?? '기기 기본'}</span>
         <button
           type="button"
           onClick={() => {
@@ -138,7 +146,7 @@ export function OpicPlayer({
       </div>
 
       {showVoices && (
-        <div className="flex flex-col gap-2 rounded-xl bg-op-bg p-3">
+        <div className="flex flex-col gap-2.5 rounded-xl bg-op-bg p-3">
           {voices.length === 0 ? (
             <>
               <p className="m-0 text-[12px] leading-relaxed text-op-ink-muted">
@@ -156,8 +164,16 @@ export function OpicPlayer({
             </>
           ) : (
             <>
+              {!gendered && (
+                <p className="m-0 rounded-lg bg-[#FFF4C7] px-3 py-2 text-[12px] leading-relaxed text-[#6B4E00]">
+                  이 기기에는 <b>언어별 음성 하나씩</b>만 깔려 있어요(목록이 &ldquo;영어 미국&rdquo;처럼
+                  언어 이름이면 그렇습니다). 무엇을 골라도 성별은 같고 억양만 바뀝니다. 그래서 답변은
+                  낮은 음, 질문은 높은 음으로 읽어 구분하고 있어요. 진짜 남성 목소리를 쓰려면 안드로이드
+                  설정 → 언어 및 입력 → 음성 합성에서 음성 데이터를 추가로 설치하면 목록에 나타납니다.
+                </p>
+              )}
               {(['female', 'male'] as const).map((g) => (
-                <label key={g} className="flex items-center gap-2 text-[13px]">
+                <div key={g} className="flex items-center gap-2 text-[13px]">
                   <span className="w-20 flex-none text-op-ink-muted">
                     {g === 'female' ? '질문(여)' : '답변(남)'}
                   </span>
@@ -172,10 +188,17 @@ export function OpicPlayer({
                       </option>
                     ))}
                   </select>
-                </label>
+                  <button
+                    type="button"
+                    onClick={() => onPreview(g)}
+                    className="flex-none rounded-lg border border-op-border bg-white px-2.5 py-1.5 text-[12px] font-semibold text-op-ink"
+                  >
+                    들어보기
+                  </button>
+                </div>
               ))}
               <p className="m-0 text-[11px] text-op-ink-muted">
-                기기에 실린 목소리만 고를 수 있어요. 남성·여성 구분이 어긋나면 여기서 바꾸세요.
+                고르는 즉시 적용돼요. 옆의 &ldquo;들어보기&rdquo;로 확인해 보세요.
               </p>
             </>
           )}

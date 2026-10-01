@@ -192,13 +192,25 @@ function OpicScriptContent() {
                   {player.supported && (
                     <button
                       type="button"
-                      onClick={player.playQuestion}
+                      onClick={player.index === QUESTION_INDEX ? player.stop : player.playQuestion}
                       className="flex h-10 items-center justify-center gap-2 self-start rounded-full bg-op-eva px-4 text-[13px] font-semibold text-white"
                     >
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-                        <path d="M8 5.5v13a1 1 0 0 0 1.5.9l10-6.5a1 1 0 0 0 0-1.8l-10-6.5A1 1 0 0 0 8 5.5z" />
-                      </svg>
-                      질문 듣기 (여성)
+                      {player.index === QUESTION_INDEX ? (
+                        <>
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                            <rect x="6" y="5" width="4" height="14" rx="1" />
+                            <rect x="14" y="5" width="4" height="14" rx="1" />
+                          </svg>
+                          읽는 중 · 정지
+                        </>
+                      ) : (
+                        <>
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                            <path d="M8 5.5v13a1 1 0 0 0 1.5.9l10-6.5a1 1 0 0 0 0-1.8l-10-6.5A1 1 0 0 0 8 5.5z" />
+                          </svg>
+                          질문 듣기 (여성)
+                        </>
+                      )}
                     </button>
                   )}
                 </section>
@@ -272,6 +284,8 @@ function OpicScriptContent() {
                 femaleVoice={player.femaleVoice}
                 onVoice={player.setVoiceName}
                 onRefreshVoices={player.refreshVoices}
+                gendered={player.gendered}
+                onPreview={player.preview}
               />
 
               {question.sharedQuestion && (
