@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { ArrowLeftIcon, CheckIcon } from '../components/icons'
+import { ArrowLeftIcon } from '../components/icons'
 import { Loading } from '../components/Loading'
+import { WordSetPicker } from '../components/WordSetPicker'
 import { getWordSetAttemptCounts, getWordSets } from '../lib/db'
 import { loadWordSetsCache, saveWordSetsCache, type WordSetItem } from '../lib/wordSetsCache'
 import { formatDate } from '../lib/quiz'
@@ -145,46 +146,29 @@ export function TestSelect() {
             </Link>
           </div>
         ) : (
-          <div className="flex flex-col gap-2.5">
-            {sortedSets.map((s) => {
-              const checked = selected.has(s.id)
+          <WordSetPicker
+            sets={sortedSets}
+            selected={selected}
+            onToggle={toggle}
+            renderMeta={(s) => {
               const progress = peekQuizProgress(String(s.id))
               const attempts = attemptCounts.get(s.id) ?? 0
               return (
-                <button
-                  key={s.id}
-                  type="button"
-                  role="checkbox"
-                  aria-checked={checked}
-                  onClick={() => toggle(s.id)}
-                  className={`m-0 flex w-full items-center gap-3.5 rounded-2xl border p-4 text-left ${
-                    checked ? 'border-primary bg-primary-tint/40' : 'border-border bg-surface'
-                  }`}
-                >
-                  <div
-                    className={`flex h-7 w-7 flex-none items-center justify-center rounded-lg border-2 ${
-                      checked ? 'border-primary bg-primary text-white' : 'border-border bg-surface text-transparent'
-                    }`}
-                  >
-                    <CheckIcon width={16} height={16} strokeWidth={3} />
+                <>
+                  <div className="mt-0.5 flex flex-wrap items-center gap-x-1.5 text-[12.5px] font-normal text-ink-muted">
+                    <span>단어 {s.count}개</span>
+                    <span>· {formatDate(s.createdAt)}</span>
+                    {attempts > 0 && <span>· 테스트 {attempts}회 완료</span>}
                   </div>
-                  <div className="min-w-0 flex-1">
-                    <div className="truncate text-[16px] font-bold">{s.title}</div>
-                    <div className="mt-0.5 flex flex-wrap items-center gap-x-1.5 text-[12.5px] font-normal text-ink-muted">
-                      <span>단어 {s.count}개</span>
-                      <span>· {formatDate(s.createdAt)}</span>
-                      {attempts > 0 && <span>· 테스트 {attempts}회 완료</span>}
+                  {progress && (
+                    <div className="mt-1 inline-flex items-center gap-1 rounded-full bg-accent-tint px-2 py-0.5 text-[11.5px] font-bold text-accent-dark">
+                      이어서 풀 수 있어요 · {progress.answered}/{progress.total}
                     </div>
-                    {progress && (
-                      <div className="mt-1 inline-flex items-center gap-1 rounded-full bg-accent-tint px-2 py-0.5 text-[11.5px] font-bold text-accent-dark">
-                        이어서 풀 수 있어요 · {progress.answered}/{progress.total}
-                      </div>
-                    )}
-                  </div>
-                </button>
+                  )}
+                </>
               )
-            })}
-          </div>
+            }}
+          />
         )}
       </div>
 
