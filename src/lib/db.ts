@@ -197,3 +197,60 @@ export function setWrongNoteResolved(wordId: number, resolved: boolean): Promise
 export function getHomeStats(): Promise<HomeStats> {
   return api('/home-stats')
 }
+
+// ---- 매일 숙제 ----
+
+export interface HomeworkWordSet {
+  id: number
+  title: string
+  count: number
+}
+
+export interface HomeworkRecord {
+  id: number
+  /** "2026-10-02" — 시간대 없는 달력 날짜 */
+  dueDate: string
+  wordSetIds: number[]
+  /** 실제로 남아 있는 단어장만. 지워진 단어장은 빠진다. */
+  wordSets: HomeworkWordSet[]
+  /** 0이면 전체 */
+  questionCount: number
+  createdAt: number
+  completedAt: number | null
+  completedGroupId: string | null
+}
+
+export interface PendingHomework {
+  today: HomeworkRecord[]
+  /** 오래된 것부터 */
+  overdue: HomeworkRecord[]
+}
+
+export function getHomework(from: string, to: string): Promise<HomeworkRecord[]> {
+  return api(`/homework?from=${from}&to=${to}`)
+}
+
+export function getPendingHomework(today: string): Promise<PendingHomework> {
+  return api(`/homework/pending?today=${today}`)
+}
+
+export function getHomeworkById(id: number): Promise<HomeworkRecord> {
+  return api(`/homework/${id}`)
+}
+
+export function createHomework(input: {
+  fromDate: string
+  toDate: string
+  wordSetIds: number[]
+  questionCount: number
+}): Promise<HomeworkRecord[]> {
+  return api('/homework', { method: 'POST', body: JSON.stringify(input) })
+}
+
+export function completeHomework(id: number, groupId: string): Promise<void> {
+  return api(`/homework/${id}/complete`, { method: 'POST', body: JSON.stringify({ groupId }) })
+}
+
+export function deleteHomework(id: number): Promise<void> {
+  return api(`/homework/${id}`, { method: 'DELETE' })
+}

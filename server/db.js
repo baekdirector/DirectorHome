@@ -5,6 +5,12 @@ import pg from 'pg'
 // range). Our values never do, so parse them back to numbers.
 pg.types.setTypeParser(20, (val) => parseInt(val, 10))
 
+// DATE (OID 1082)는 시간대 없는 달력 날짜다. 기본 파서는 이것을 "지역 자정" Date 객체로
+// 바꾸는데, 그 뒤 어떤 시간대로 다시 읽느냐에 따라 하루가 밀린다(한국에서 2026-12-01이
+// UTC로는 2026-11-30 15:00이다). 문자열 'YYYY-MM-DD' 그대로 둬서 시간대가 끼어들 자리를
+// 없앤다.
+pg.types.setTypeParser(1082, (val) => val)
+
 const isLocal = /localhost|127\.0\.0\.1/.test(process.env.DATABASE_URL ?? '')
 
 export const pool = new pg.Pool({
@@ -168,6 +174,24 @@ export async function migrate() {
 
     CREATE INDEX IF NOT EXISTS idx_opic_questions_topic ON opic_questions(topic_id, seq);
     CREATE INDEX IF NOT EXISTS idx_opic_questions_hash ON opic_questions(answer_hash);
+
+    -- ---- 매일 숙제 ----
+    -- 숙제는 날짜마다 한 행이다. 기간 배정은 서버가 날짜별로 펼쳐 넣는다.
+    -- due_date를 시간대 없는 DATE로 두는 이유: 서버는 UTC로 도는데 "오늘"은 아이가 있는
+    -- 곳의 달력 날짜다. 클라이언트가 자기 지역 날짜를 문자열로 보내 비교만 한다.
+    CREATE TABLE IF NOT EXISTS homework (
+      id SERIAL PRIMARY KEY,
+      due_date DATE NOT NULL,
+      word_set_ids INTEGER[] NOT NULL,
+      -- 0이면 고른 단어장의 단어를 전부 낸다.
+      question_count INTEGER NOT NULL DEFAULT 0,
+      created_at BIGINT NOT NULL,
+      -- NULL이면 아직 안 끝낸 숙제다.
+      completed_at BIGINT,
+      completed_group_id TEXT
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_homework_due_date ON homework(due_date);
   `)
 
   // 오답 노트 기능 이전의 틀린 기록으로 노트를 채운다. 이미 노트에 있는 단어는 건드리지 않는다.

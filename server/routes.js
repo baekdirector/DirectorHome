@@ -211,6 +211,134 @@ router.delete('/words/:id', async (req, res) => {
   res.json({ ok: true })
 })
 
+// ---- 매일 숙제 ----
+
+// due_date는 DATE라 pg가 Date 객체로 돌려준다. 그대로 JSON에 넣으면 UTC 시각 문자열이
+// 되어 시간대가 섞이므로, 달력 날짜 문자열로 되돌린다.
+function toDateString(value) {
+  if (typeof value === 'string') return value.slice(0, 10)
+  const d = new Date(value)
+  const month = String(d.getUTCMonth() + 1).padStart(2, '0')
+  const day = String(d.getUTCDate()).padStart(2, '0')
+  return `${d.getUTCFullYear()}-${month}-${day}`
+}
+
+const DATE_RE = /^\d{4}-\d{2}-\d{2}$/
+const MAX_RANGE_DAYS = 92
+
+/**
+ * 숙제 행들에 단어장 제목과 현재 단어 수를 붙인다.
+ * 지워진 단어장 id는 조인에서 빠지므로 조용히 사라진다(설계 3.5).
+ */
+async function withWordSets(rows) {
+  if (rows.length === 0) return []
+  const ids = [...new Set(rows.flatMap((r) => r.wordSetIds))]
+  const { rows: sets } = await pool.query(
+    `SELECT ws.id, ws.title, COUNT(w.id)::int AS count
+     FROM word_sets ws LEFT JOIN words w ON w.word_set_id = ws.id
+     WHERE ws.id = ANY($1::int[])
+     GROUP BY ws.id, ws.title`,
+    [ids],
+  )
+  const byId = new Map(sets.map((s) => [s.id, s]))
+  return rows.map((r) => ({
+    ...r,
+    dueDate: toDateString(r.dueDate),
+    wordSets: r.wordSetIds.map((id) => byId.get(id)).filter(Boolean),
+  }))
+}
+
+const HOMEWORK_COLUMNS = `id, due_date AS "dueDate", word_set_ids AS "wordSetIds",
+         question_count AS "questionCount", created_at AS "createdAt",
+         completed_at AS "completedAt", completed_group_id AS "completedGroupId"`
+
+router.get('/homework', async (req, res) => {
+  const { from, to } = req.query
+  if (!DATE_RE.test(from ?? '') || !DATE_RE.test(to ?? '')) {
+    return res.status(400).json({ error: 'from, to (YYYY-MM-DD) required' })
+  }
+  const { rows } = await pool.query(
+    `SELECT ${HOMEWORK_COLUMNS} FROM homework WHERE due_date BETWEEN $1 AND $2 ORDER BY due_date, id`,
+    [from, to],
+  )
+  res.json(await withWordSets(rows))
+})
+
+// 이 라우트는 '/homework/:id'보다 먼저 와야 한다. 순서가 바뀌면 'pending'이 id로 잡힌다.
+// 아이 홈 화면용. 오늘 숙제는 끝냈어도 돌려준다("오늘 숙제 다 했어요"를 보여주려고).
+// 밀린 숙제는 안 끝낸 것만, 오래된 것부터.
+router.get('/homework/pending', async (req, res) => {
+  const today = req.query.today
+  if (!DATE_RE.test(today ?? '')) {
+    return res.status(400).json({ error: 'today (YYYY-MM-DD) required' })
+  }
+  const { rows } = await pool.query(
+    `SELECT ${HOMEWORK_COLUMNS} FROM homework
+     WHERE due_date = $1 OR (due_date < $1 AND completed_at IS NULL)
+     ORDER BY due_date, id`,
+    [today],
+  )
+  const all = await withWordSets(rows)
+  res.json({
+    today: all.filter((h) => h.dueDate === today),
+    overdue: all.filter((h) => h.dueDate < today),
+  })
+})
+
+router.get('/homework/:id', async (req, res) => {
+  const { rows } = await pool.query(`SELECT ${HOMEWORK_COLUMNS} FROM homework WHERE id = $1`, [
+    req.params.id,
+  ])
+  if (!rows[0]) return res.status(404).json({ error: 'not found' })
+  const [row] = await withWordSets(rows)
+  res.json(row)
+})
+
+router.post('/homework', async (req, res) => {
+  const { fromDate, toDate, wordSetIds, questionCount } = req.body ?? {}
+  if (!DATE_RE.test(fromDate ?? '') || !DATE_RE.test(toDate ?? '')) {
+    return res.status(400).json({ error: 'fromDate, toDate (YYYY-MM-DD) required' })
+  }
+  if (!Array.isArray(wordSetIds) || wordSetIds.length === 0) {
+    return res.status(400).json({ error: 'wordSetIds required' })
+  }
+  if (toDate < fromDate) return res.status(400).json({ error: 'toDate must not precede fromDate' })
+  const count = Number.isInteger(questionCount) && questionCount >= 0 ? questionCount : 0
+
+  // 날짜를 Postgres가 펼친다. 실수로 몇 년치를 넣는 것을 막는다.
+  const { rows } = await pool.query(
+    `INSERT INTO homework (due_date, word_set_ids, question_count, created_at)
+     SELECT d::date, $3::int[], $4, $5
+     FROM generate_series($1::date, $2::date, interval '1 day') AS d
+     WHERE $2::date - $1::date < $6
+     RETURNING ${HOMEWORK_COLUMNS}`,
+    [fromDate, toDate, wordSetIds, count, Date.now(), MAX_RANGE_DAYS],
+  )
+  if (rows.length === 0) {
+    return res.status(400).json({ error: `range must be at most ${MAX_RANGE_DAYS} days` })
+  }
+  res.json(await withWordSets(rows))
+})
+
+// 이미 끝낸 숙제는 그대로 둔다. 아이가 같은 숙제를 또 다 맞혀도 처음 기록이 남는다.
+router.post('/homework/:id/complete', async (req, res) => {
+  const groupId = req.body?.groupId
+  if (typeof groupId !== 'string' || groupId === '') {
+    return res.status(400).json({ error: 'groupId required' })
+  }
+  await pool.query(
+    `UPDATE homework SET completed_at = $1, completed_group_id = $2
+     WHERE id = $3 AND completed_at IS NULL`,
+    [Date.now(), groupId, req.params.id],
+  )
+  res.json({ ok: true })
+})
+
+router.delete('/homework/:id', async (req, res) => {
+  await pool.query(`DELETE FROM homework WHERE id = $1`, [req.params.id])
+  res.json({ ok: true })
+})
+
 // ---- quiz rounds ----
 
 router.post('/quiz-rounds', async (req, res) => {
