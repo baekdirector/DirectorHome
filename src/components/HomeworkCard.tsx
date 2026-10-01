@@ -8,6 +8,14 @@ export function homeworkWordCount(hw: HomeworkRecord): number {
   return hw.wordSets.reduce((sum, w) => sum + w.count, 0)
 }
 
+function ProgressBar({ percent, barClass }: { percent: number; barClass: string }) {
+  return (
+    <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-white/70" aria-hidden>
+      <div className={`h-full rounded-full ${barClass}`} style={{ width: `${percent}%` }} />
+    </div>
+  )
+}
+
 export function HomeworkCard({ homework, today }: { homework: HomeworkRecord; today: string }) {
   const state = homeworkState(homework, today)
   const words = homeworkWordCount(homework)
@@ -22,7 +30,7 @@ export function HomeworkCard({ homework, today }: { homework: HomeworkRecord; to
           <ClockIcon width={20} height={20} className="text-ink-muted" />
         </div>
         <div className="min-w-0 flex-1">
-          <div className="text-[16px] font-bold">{formatDueDate(homework.dueDate)} 숙제</div>
+          <div className="text-[16px] font-bold">{formatDueDate(homework.dueDate)} 단어</div>
           <div className="mt-0.5 text-[12.5px] text-ink-muted">단어가 없어요</div>
         </div>
       </div>
@@ -39,8 +47,9 @@ export function HomeworkCard({ homework, today }: { homework: HomeworkRecord; to
           <CheckCircleIcon width={20} height={20} className="text-success" />
         </div>
         <div className="min-w-0 flex-1">
-          <div className="text-[16px] font-bold text-primary-dark">오늘 숙제 다 했어요!</div>
+          <div className="text-[16px] font-bold text-primary-dark">오늘의 단어 100% 달성!</div>
           <div className="mt-0.5 truncate text-[12.5px] text-primary-dark/80">{titles}</div>
+          <ProgressBar percent={100} barClass="bg-success" />
         </div>
         <ChevronRightIcon width={18} height={18} className="text-primary-dark" />
       </Link>
@@ -58,11 +67,36 @@ export function HomeworkCard({ homework, today }: { homework: HomeworkRecord; to
         </div>
         <div className="min-w-0 flex-1">
           <div className="text-[16px] font-bold text-accent-dark">
-            밀린 숙제 · {formatDueDate(homework.dueDate)}
+            밀린 단어 · {formatDueDate(homework.dueDate)}
           </div>
           <div className="mt-0.5 truncate text-[12.5px] text-accent-dark/80">
             {titles} · {count}문제
           </div>
+        </div>
+        <ChevronRightIcon width={18} height={18} className="text-accent-dark" />
+      </Link>
+    )
+  }
+
+  if (state === 'today-tried') {
+    const correct = homework.attemptCorrect ?? 0
+    const total = homework.attemptTotal ?? count
+    return (
+      <Link
+        to={`/quiz/homework/${homework.id}`}
+        className="flex items-center gap-3.5 rounded-[20px] border-2 border-accent bg-accent-tint p-4.5"
+      >
+        <div className="flex h-11 w-11 flex-none items-center justify-center rounded-2xl bg-white/70">
+          <ClockIcon width={20} height={20} className="text-accent-dark" />
+        </div>
+        <div className="min-w-0 flex-1">
+          <div className="text-[16px] font-bold text-accent-dark">
+            오늘의 단어, 아직 완료 못했어요
+          </div>
+          <div className="mt-0.5 truncate text-[12.5px] text-accent-dark/80">
+            마지막 시도 {correct}/{total} 맞힘 · 눌러서 다시 도전해요
+          </div>
+          <ProgressBar percent={Math.round((correct / total) * 100)} barClass="bg-accent" />
         </div>
         <ChevronRightIcon width={18} height={18} className="text-accent-dark" />
       </Link>
@@ -80,7 +114,7 @@ export function HomeworkCard({ homework, today }: { homework: HomeworkRecord; to
         </svg>
       </div>
       <div className="min-w-0 flex-1">
-        <div className="text-[17px] font-bold text-white">오늘의 숙제</div>
+        <div className="text-[17px] font-bold text-white">오늘의 단어</div>
         <div className="mt-0.5 truncate text-[12.5px] text-white/85">
           {titles} · {count}문제
         </div>

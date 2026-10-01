@@ -6,6 +6,7 @@ import {
   homeworkState,
   localDateString,
   nextDate,
+  parseQuestionCount,
   shiftDate,
 } from './homework'
 
@@ -126,5 +127,41 @@ describe('homeworkState', () => {
 
   it('앞으로 올 날짜면 upcoming', () => {
     expect(homeworkState({ dueDate: '2026-10-03', completedAt: null }, today)).toBe('upcoming')
+  })
+
+  it('오늘 숙제를 풀어 봤지만 아직 못 끝냈으면 today-tried', () => {
+    expect(homeworkState({ dueDate: today, completedAt: null, attemptedAt: 5 }, today)).toBe('today-tried')
+  })
+
+  it('풀어 본 기록이 있어도 끝냈으면 today-done', () => {
+    expect(homeworkState({ dueDate: today, completedAt: 9, attemptedAt: 5 }, today)).toBe('today-done')
+  })
+
+  it('밀린 숙제는 풀어 봤어도 overdue 그대로', () => {
+    expect(homeworkState({ dueDate: '2026-09-30', completedAt: null, attemptedAt: 5 }, today)).toBe('overdue')
+  })
+})
+
+describe('parseQuestionCount', () => {
+  it('양의 정수 문자열을 숫자로 읽는다', () => {
+    expect(parseQuestionCount('50')).toBe(50)
+    expect(parseQuestionCount(' 7 ')).toBe(7)
+  })
+
+  it('비었거나 숫자가 아니거나 0 이하면 null', () => {
+    expect(parseQuestionCount('')).toBeNull()
+    expect(parseQuestionCount('abc')).toBeNull()
+    expect(parseQuestionCount('0')).toBeNull()
+    expect(parseQuestionCount('-3')).toBeNull()
+  })
+
+  it('소수나 숫자 뒤에 글자가 붙은 것은 받지 않는다', () => {
+    expect(parseQuestionCount('2.5')).toBeNull()
+    expect(parseQuestionCount('20개')).toBeNull()
+  })
+
+  it('너무 큰 값은 상한(1000)으로 막는다', () => {
+    expect(parseQuestionCount('5000')).toBeNull()
+    expect(parseQuestionCount('1000')).toBe(1000)
   })
 })

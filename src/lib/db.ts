@@ -223,6 +223,10 @@ export interface HomeworkRecord {
   createdAt: number
   completedAt: number | null
   completedGroupId: string | null
+  /** 풀어 봤지만 끝내지 못한 마지막 시도. 없으면 null */
+  attemptedAt: number | null
+  attemptCorrect: number | null
+  attemptTotal: number | null
 }
 
 export interface PendingHomework {
@@ -254,6 +258,10 @@ export function createHomework(input: {
 
 export function completeHomework(id: number, groupId: string): Promise<void> {
   return api(`/homework/${id}/complete`, { method: 'POST', body: JSON.stringify({ groupId }) })
+}
+
+export function recordHomeworkAttempt(id: number, correct: number, total: number): Promise<void> {
+  return api(`/homework/${id}/attempt`, { method: 'POST', body: JSON.stringify({ correct, total }) })
 }
 
 export function deleteHomework(id: number): Promise<void> {

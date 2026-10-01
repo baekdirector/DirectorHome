@@ -258,7 +258,9 @@ async function withWordSets(rows) {
 
 const HOMEWORK_COLUMNS = `id, due_date AS "dueDate", word_set_ids AS "wordSetIds",
          question_count AS "questionCount", created_at AS "createdAt",
-         completed_at AS "completedAt", completed_group_id AS "completedGroupId"`
+         completed_at AS "completedAt", completed_group_id AS "completedGroupId",
+         attempted_at AS "attemptedAt", attempt_correct AS "attemptCorrect",
+         attempt_total AS "attemptTotal"`
 
 router.get('/homework', async (req, res) => {
   const { from, to } = req.query
@@ -338,6 +340,20 @@ router.post('/homework/:id/complete', async (req, res) => {
     `UPDATE homework SET completed_at = $1, completed_group_id = $2
      WHERE id = $3 AND completed_at IS NULL`,
     [Date.now(), groupId, req.params.id],
+  )
+  res.json({ ok: true })
+})
+
+// 끝내지 못한 시도의 마지막 결과. 끝낸 숙제는 처음 기록을 지키려고 건드리지 않는다.
+router.post('/homework/:id/attempt', async (req, res) => {
+  const { correct, total } = req.body ?? {}
+  if (!Number.isInteger(correct) || !Number.isInteger(total) || total < 1 || correct < 0 || correct > total) {
+    return res.status(400).json({ error: 'correct and total required' })
+  }
+  await pool.query(
+    `UPDATE homework SET attempted_at = $1, attempt_correct = $2, attempt_total = $3
+     WHERE id = $4 AND completed_at IS NULL`,
+    [Date.now(), correct, total, req.params.id],
   )
   res.json({ ok: true })
 })

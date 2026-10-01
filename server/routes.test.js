@@ -1,6 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import express from 'express'
 import { router } from './routes.js'
+import { migrate } from './db.js'
 
 describe('POST /expense/verify-password', () => {
   let server
@@ -61,6 +62,7 @@ describe.skipIf(!hasDb)('숙제 라우트', () => {
   }
 
   beforeAll(async () => {
+    await migrate()
     const app = express()
     app.use(express.json())
     app.use('/api', router)
@@ -123,6 +125,40 @@ describe.skipIf(!hasDb)('숙제 라우트', () => {
 
     expect(afterSecond.completedGroupId).toBe('first')
     expect(afterSecond.completedAt).toBe(afterFirst.completedAt)
+  })
+
+  it('풀어 본 결과를 남기고, 끝낸 숙제는 건드리지 않는다', async () => {
+    const { body: created } = await call('/homework', {
+      method: 'POST',
+      body: JSON.stringify({
+        fromDate: '2031-03-12',
+        toDate: '2031-03-12',
+        wordSetIds: [wordSetId],
+        questionCount: 0,
+      }),
+    })
+    const id = created[0].id
+    made.push(id)
+    expect(created[0].attemptedAt).toBeNull()
+
+    await call(`/homework/${id}/attempt`, { method: 'POST', body: JSON.stringify({ correct: 45, total: 50 }) })
+    const { body: tried } = await call(`/homework/${id}`)
+    expect(tried.attemptCorrect).toBe(45)
+    expect(tried.attemptTotal).toBe(50)
+    expect(typeof tried.attemptedAt).toBe('number')
+
+    await call(`/homework/${id}/complete`, { method: 'POST', body: JSON.stringify({ groupId: 'g' }) })
+    await call(`/homework/${id}/attempt`, { method: 'POST', body: JSON.stringify({ correct: 1, total: 50 }) })
+    const { body: done } = await call(`/homework/${id}`)
+    expect(done.attemptCorrect).toBe(45)
+  })
+
+  it('결과 값이 잘못되면 400', async () => {
+    const { status } = await call('/homework/1/attempt', {
+      method: 'POST',
+      body: JSON.stringify({ correct: 60, total: 50 }),
+    })
+    expect(status).toBe(400)
   })
 
   it('없는 단어장 id는 조용히 빠진다', async () => {

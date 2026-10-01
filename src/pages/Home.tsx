@@ -117,18 +117,18 @@ export function Home() {
 
           <Link
             to="/test"
-            className="flex items-center gap-3.5 rounded-[20px] bg-primary p-4.5 shadow-[0_8px_20px_-10px_rgba(20,79,76,0.55)]"
+            className="flex items-center gap-3.5 rounded-[20px] border-2 border-primary bg-surface p-4.5"
           >
-            <div className="flex h-11 w-11 flex-none items-center justify-center rounded-2xl bg-white/20">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" className="text-white">
+            <div className="flex h-11 w-11 flex-none items-center justify-center rounded-2xl bg-primary-tint">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" className="text-primary">
                 <path d="M8 5l11 7-11 7Z" />
               </svg>
             </div>
             <div className="flex-1">
-              <div className="text-[17px] font-bold text-white">테스트 시작하기</div>
-              <div className="mt-0.5 text-[12.5px] text-white/85">단어장을 골라서 시험 보기</div>
+              <div className="text-[17px] font-bold text-primary-dark">직접 테스트하기</div>
+              <div className="mt-0.5 text-[12.5px] text-ink-muted">단어장을 골라서 시험 보기</div>
             </div>
-            <ChevronRightIcon width={18} height={18} className="text-white" />
+            <ChevronRightIcon width={18} height={18} className="text-primary" />
           </Link>
 
           <Link to="/wrong" className="flex items-center gap-3.5 rounded-[20px] border border-border bg-surface p-4.5">

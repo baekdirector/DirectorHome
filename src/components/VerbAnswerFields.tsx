@@ -30,10 +30,9 @@ export function VerbAnswerFields({
   correct: { term: string; past: string; participle: string }
   disabled: boolean
 }) {
-  const first = useRef<HTMLInputElement>(null)
   const second = useRef<HTMLInputElement>(null)
   const third = useRef<HTMLInputElement>(null)
-  const refs = [first, second, third]
+  const refs = [null, second, third]
 
   const answerOf = (key: keyof VerbAnswer) =>
     key === 'present' ? correct.term : key === 'past' ? correct.past : correct.participle
@@ -41,7 +40,9 @@ export function VerbAnswerFields({
   return (
     <div className="flex flex-col gap-3">
       {LABELS.map(({ key, label }, i) => {
-        const wrong = result ? !result[key] : false
+        // 현재형은 문제로 주어지는 값이라 고칠 수 없다.
+        const fixed = key === 'present'
+        const wrong = !fixed && result ? !result[key] : false
         return (
           <div key={key} className="flex min-w-0 flex-col gap-1">
             <label htmlFor={`verb-${key}`} className="text-[13px] font-semibold text-ink-muted">
@@ -50,7 +51,9 @@ export function VerbAnswerFields({
             <input
               id={`verb-${key}`}
               ref={refs[i]}
-              value={value[key]}
+              value={fixed ? correct.term : value[key]}
+              readOnly={fixed}
+              tabIndex={fixed ? -1 : undefined}
               disabled={disabled}
               autoComplete="off"
               autoCapitalize="none"
@@ -59,11 +62,17 @@ export function VerbAnswerFields({
               onKeyDown={(e) => {
                 if (e.key !== 'Enter') return
                 e.preventDefault()
-                if (i < 2) refs[i + 1].current?.focus()
-                else onSubmit()
+                if (i === 1) third.current?.focus()
+                else if (i === 2) onSubmit()
               }}
-              className={`w-full min-w-0 rounded-xl border bg-surface px-3 py-2.5 font-display text-[19px] outline-none ${
-                wrong ? 'border-2 border-error' : 'border-border focus:border-primary'
+              className={`w-full min-w-0 rounded-xl border px-3 py-2.5 font-display text-[19px] outline-none ${
+                fixed ? '' : 'bg-surface'
+              } ${
+                fixed
+                  ? 'border-border bg-surface-alt text-ink-muted'
+                  : wrong
+                    ? 'border-2 border-error'
+                    : 'border-border focus:border-primary'
               }`}
             />
             {wrong && (

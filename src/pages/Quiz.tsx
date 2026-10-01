@@ -17,6 +17,7 @@ import { Loading } from '../components/Loading'
 import { useSpeak } from '../lib/useSpeak'
 import {
   completeHomework,
+  recordHomeworkAttempt,
   getHomeworkById,
   getWordSet,
   getWordsBySet,
@@ -341,10 +342,12 @@ export function Quiz() {
   function submit(skip = false) {
     if (!currentQuestion) return
     if (currentQuestion.type === 'verb') {
-      const result = skip ? null : checkVerbAnswer(formsOf(currentQuestion.word), verbInput)
+      // 현재형은 문제로 주어진 칸이라 사용자가 쓴 값이 아니라 단어 그대로 채점한다.
+      const typed = { ...verbInput, present: currentQuestion.word.term }
+      const result = skip ? null : checkVerbAnswer(formsOf(currentQuestion.word), typed)
       const record = buildAnswer(
         currentQuestion,
-        skip ? '' : joinVerbAnswer(verbInput),
+        skip ? '' : joinVerbAnswer(typed),
         result?.all ?? false,
       )
       setAnswers((prev) => {
@@ -429,8 +432,11 @@ export function Quiz() {
         // 시험 기록은 이미 저장됐다. 숙제 도장만 못 찍었으니 결과 화면은 그대로 보여주고
         // 조용히 알린다. 다시 풀면 복구된다. submitError는 문제 화면 전용이라 여기서는
         // 결과에 실어 보내야 보인다.
-        homeworkError = '숙제 완료를 기록하지 못했어요. 인터넷이 연결되면 다시 풀어주세요.'
+        homeworkError = '오늘의 단어 완료를 기록하지 못했어요. 인터넷이 연결되면 다시 풀어주세요.'
       }
+    } else if (homeworkId !== null) {
+      // 못 끝낸 시도도 남겨서 홈에서 "아직 완료 못했어요"를 보여준다. 실패해도 시험 흐름은 막지 않는다.
+      await recordHomeworkAttempt(homeworkId, correctCount, finalAnswers.length).catch(() => {})
     }
 
     setRoundResult({
@@ -912,7 +918,7 @@ function VerbQuestion({
     <>
       <div className="flex justify-center">
         <span className="rounded-full bg-primary-tint px-3.5 py-1.5 text-[12.5px] font-bold text-primary-dark">
-          뜻을 보고 3단 변화를 써보세요
+          뜻을 보고 과거형과 과거분사형을 써보세요
         </span>
       </div>
 
@@ -1063,7 +1069,7 @@ function RoundSummary({
           </p>
           {result.homeworkDone && (
             <span className="rounded-full bg-accent-tint px-3 py-1 text-[12.5px] font-bold text-accent-dark">
-              오늘 숙제 끝!
+              오늘의 단어 100% 달성!
             </span>
           )}
           {result.homeworkError && (

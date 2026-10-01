@@ -199,6 +199,11 @@ export async function migrate() {
     );
 
     CREATE INDEX IF NOT EXISTS idx_homework_due_date ON homework(due_date);
+
+    -- 풀어 봤지만 아직 못 끝낸 숙제를 홈에서 알아보기 위한 마지막 시도 기록.
+    ALTER TABLE homework ADD COLUMN IF NOT EXISTS attempted_at BIGINT;
+    ALTER TABLE homework ADD COLUMN IF NOT EXISTS attempt_correct INTEGER;
+    ALTER TABLE homework ADD COLUMN IF NOT EXISTS attempt_total INTEGER;
   `)
 
   // 오답 노트 기능 이전의 틀린 기록으로 노트를 채운다. 이미 노트에 있는 단어는 건드리지 않는다.

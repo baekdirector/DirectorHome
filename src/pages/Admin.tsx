@@ -11,10 +11,15 @@ import {
   getWordSets,
   type HomeworkRecord,
 } from '../lib/db'
-import { dayCount, formatDueDate, localDateString, nextDate, shiftDate } from '../lib/homework'
+import {
+  dayCount,
+  formatDueDate,
+  localDateString,
+  nextDate,
+  parseQuestionCount,
+  shiftDate,
+} from '../lib/homework'
 import type { WordSetItem } from '../lib/wordSetsCache'
-
-const COUNT_OPTIONS = [5, 10, 20, 0] as const
 
 /** 목록에 보여줄 범위: 지난 2주 ~ 앞으로 4주. 전부 불러오면 시간이 갈수록 느려진다. */
 const PAST_DAYS = 14
@@ -39,7 +44,8 @@ function AdminBody() {
   const [selected, setSelected] = useState<Set<number>>(new Set())
   const [fromDate, setFromDate] = useState(today)
   const [toDate, setToDate] = useState(today)
-  const [questionCount, setQuestionCount] = useState<number>(20)
+  const [countText, setCountText] = useState('20')
+  const [allWords, setAllWords] = useState(false)
 
   const [list, setList] = useState<HomeworkRecord[] | null>(null)
   const [saving, setSaving] = useState(false)
@@ -65,7 +71,11 @@ function AdminBody() {
   const days = dayCount(fromDate, toDate)
   const latestAllowed = shiftDate(today, FUTURE_DAYS)
   const tooFar = toDate > latestAllowed
-  const canAssign = selected.size > 0 && days > 0 && !tooFar && !saving
+  const parsedCount = parseQuestionCount(countText)
+  // 0은 서버에서 "전체"를 뜻한다.
+  const questionCount = allWords ? 0 : parsedCount
+  const selectedWordTotal = (sets ?? []).filter((w) => selected.has(w.id)).reduce((n, w) => n + w.count, 0)
+  const canAssign = selected.size > 0 && days > 0 && !tooFar && !saving && questionCount !== null
 
   function toggle(id: number) {
     setSelected((prev) => {
@@ -77,7 +87,7 @@ function AdminBody() {
   }
 
   async function assign() {
-    if (!canAssign) return
+    if (!canAssign || questionCount === null) return
     setSaving(true)
     setError('')
     try {
@@ -179,23 +189,38 @@ function AdminBody() {
           </div>
 
           <p className="m-0 mt-4 text-[13px] font-bold text-ink-muted">문제 수</p>
-          <div className="mt-1.5 grid grid-cols-4 gap-1.5">
-            {COUNT_OPTIONS.map((n) => (
-              <button
-                key={n}
-                type="button"
-                onClick={() => setQuestionCount(n)}
-                aria-pressed={questionCount === n}
-                className={`h-10 rounded-xl text-[14px] font-semibold ${
-                  questionCount === n
-                    ? 'bg-primary text-white'
-                    : 'border border-border bg-surface text-ink-muted'
-                }`}
-              >
-                {n === 0 ? '전체' : n}
-              </button>
-            ))}
+          <div className="mt-1.5 flex items-center gap-2">
+            <input
+              type="text"
+              inputMode="numeric"
+              aria-label="문제 수"
+              value={allWords ? '' : countText}
+              disabled={allWords}
+              placeholder={allWords ? '전체' : '예: 50'}
+              onChange={(e) => setCountText(e.target.value)}
+              className="min-w-0 flex-1 rounded-xl border border-border bg-surface px-3 py-2.5 text-[15px] outline-none focus:border-primary disabled:bg-surface-alt"
+            />
+            <span className="text-[14px] text-ink-muted">문제</span>
+            <button
+              type="button"
+              onClick={() => setAllWords((v) => !v)}
+              aria-pressed={allWords}
+              className={`h-10 flex-none rounded-xl px-3.5 text-[14px] font-semibold ${
+                allWords ? 'bg-primary text-white' : 'border border-border bg-surface text-ink-muted'
+              }`}
+            >
+              전체
+            </button>
           </div>
+          <p className="m-0 mt-1.5 text-[12.5px] leading-relaxed text-ink-muted">
+            {selected.size > 0 && `고른 단어 ${selectedWordTotal}개 중에서 `}
+            날마다 새로 무작위로 뽑아요. 여러 날을 한꺼번에 내도 날마다 다른 단어가 나와요.
+          </p>
+          {!allWords && parsedCount === null && (
+            <p className="m-0 mt-1 text-[12.5px] font-semibold text-error">
+              문제 수를 1~1000 사이 숫자로 입력해 주세요.
+            </p>
+          )}
 
           {days === 0 && (
             <p className="m-0 mt-2 text-[12.5px] font-semibold text-error">
@@ -245,8 +270,16 @@ function AdminBody() {
                           완료
                         </span>
                       ) : (
-                        <span className="rounded-full bg-surface-alt px-2 py-0.5 text-[11.5px] font-bold text-ink-muted">
-                          안 함
+                        <span
+                          className={`rounded-full px-2 py-0.5 text-[11.5px] font-bold ${
+                            hw.attemptedAt !== null
+                              ? 'bg-accent-tint text-accent-dark'
+                              : 'bg-surface-alt text-ink-muted'
+                          }`}
+                        >
+                          {hw.attemptedAt !== null
+                            ? `도전 중 ${hw.attemptCorrect}/${hw.attemptTotal}`
+                            : '안 함'}
                         </span>
                       )}
                     </div>

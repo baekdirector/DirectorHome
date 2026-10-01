@@ -59,14 +59,24 @@ export function formatDueDate(date: string): string {
   return `${d.getUTCMonth() + 1}월 ${d.getUTCDate()}일 (${DAY_LABELS[d.getUTCDay()]})`
 }
 
-export type HomeworkState = 'today' | 'today-done' | 'overdue' | 'done' | 'upcoming'
+export type HomeworkState = 'today' | 'today-tried' | 'today-done' | 'overdue' | 'done' | 'upcoming'
 
 /** 홈 카드의 색과 문구를 정하는 상태. 날짜 문자열은 사전순 비교가 곧 날짜순 비교다. */
 export function homeworkState(
-  hw: { dueDate: string; completedAt: number | null },
+  hw: { dueDate: string; completedAt: number | null; attemptedAt?: number | null },
   today: string,
 ): HomeworkState {
   if (hw.completedAt !== null) return hw.dueDate === today ? 'today-done' : 'done'
-  if (hw.dueDate === today) return 'today'
+  if (hw.dueDate === today) return hw.attemptedAt != null ? 'today-tried' : 'today'
   return hw.dueDate < today ? 'overdue' : 'upcoming'
+}
+
+export const MAX_QUESTION_COUNT = 1000
+
+/** 문제 수 입력칸의 글자를 양의 정수로 읽는다. 쓸 수 없는 값이면 null. */
+export function parseQuestionCount(raw: string): number | null {
+  const text = raw.trim()
+  if (!/^\d+$/.test(text)) return null
+  const n = Number(text)
+  return n >= 1 && n <= MAX_QUESTION_COUNT ? n : null
 }
