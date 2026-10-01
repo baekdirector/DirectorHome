@@ -1,6 +1,7 @@
-import type { WordRecord } from './db'
+// 문항 유형은 기록으로 저장되는 값이라 db.ts 하나만을 출처로 삼는다.
+import type { QuestionType, WordRecord } from './db'
 
-export type QuestionType = 'spelling' | 'meaning'
+export type { QuestionType }
 
 /** 시험 유형: 한 가지 유형만 내거나 ('mixed'는 문제마다 무작위) */
 export type QuizMode = QuestionType | 'mixed'
@@ -29,6 +30,14 @@ export interface GenerateOptions {
   shuffle?: boolean
 }
 
+/**
+ * 변화형이 저장된 단어인지. 유형은 단어장이 아니라 단어를 보고 정한다 — 한 시험에
+ * 여러 단어장을 섞어 고를 수 있고, 오답 노트 시험에는 단어장이 아예 없기 때문이다.
+ */
+export function isVerbWord(word: QuizWord): boolean {
+  return (word.past ?? '').trim() !== '' && (word.participle ?? '').trim() !== ''
+}
+
 /** Picks `count` words (all by default), one question each. Random order unless `shuffle` is false. */
 export function generateQuestions(
   words: QuizWord[],
@@ -38,7 +47,13 @@ export function generateQuestions(
   const picked = count === undefined ? ordered : ordered.slice(0, Math.max(0, count))
   return picked.map((word) => ({
     word,
-    type: mode === 'mixed' ? (Math.random() < 0.5 ? 'spelling' : 'meaning') : mode,
+    type: isVerbWord(word)
+      ? 'verb'
+      : mode === 'mixed'
+        ? Math.random() < 0.5
+          ? 'spelling'
+          : 'meaning'
+        : mode,
   }))
 }
 

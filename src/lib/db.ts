@@ -22,7 +22,8 @@ export interface WordRecord {
   participle?: string | null
 }
 
-export type QuestionType = 'spelling' | 'meaning'
+/** 'verb'는 동사 3단변화 문항(정답·답안이 "현재 | 과거 | 과거분사" 한 줄로 저장된다). */
+export type QuestionType = 'spelling' | 'meaning' | 'verb'
 
 export interface QuizSessionRecord {
   id: number

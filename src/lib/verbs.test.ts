@@ -5,6 +5,7 @@ import {
   joinVerbForms,
   parseVerbLine,
   parseVerbsDetailed,
+  splitVerbAnswer,
   verbPattern,
 } from './verbs'
 
@@ -156,5 +157,24 @@ describe('joinVerbForms / joinVerbAnswer', () => {
 
   it('입력한 세 칸도 같은 방식으로 잇는다', () => {
     expect(joinVerbAnswer({ present: 'come', past: '', participle: 'comed' })).toBe('come |  | comed')
+  })
+})
+
+describe('splitVerbAnswer', () => {
+  it('joinVerbAnswer로 합친 답을 그대로 되돌린다', () => {
+    const answer = { present: 'come', past: 'came', participle: 'come' }
+    expect(splitVerbAnswer(joinVerbAnswer(answer))).toEqual(answer)
+  })
+
+  it('빈 칸이 섞여 있어도 자리를 지켜 되돌린다', () => {
+    expect(splitVerbAnswer(joinVerbAnswer({ present: '', past: 'came', participle: '' }))).toEqual({
+      present: '',
+      past: 'came',
+      participle: '',
+    })
+  })
+
+  it('모르겠어요로 넘겨 빈 문자열이 저장된 경우 세 칸 모두 빈 칸이 된다', () => {
+    expect(splitVerbAnswer('')).toEqual({ present: '', past: '', participle: '' })
   })
 })

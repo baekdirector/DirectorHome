@@ -122,3 +122,33 @@ describe('날짜 표시', () => {
     expect(formatDateTime(new Date(2026, 8, 22, 15, 30).getTime())).toBe('9월 22일 (화) 오후 3:30')
   })
 })
+
+describe('동사 3단변화 문제 출제', () => {
+  const verbWord: QuizWord = {
+    id: 10,
+    wordSetId: 2,
+    term: 'come',
+    meaning: '오다',
+    isIdiom: false,
+    past: 'came',
+    participle: 'come',
+  }
+
+  it('변화형이 저장된 단어는 mode가 spelling이어도 동사 문제로 낸다', () => {
+    const [q] = generateQuestions([verbWord], { mode: 'spelling' })
+    expect(q.type).toBe('verb')
+  })
+
+  it('일반 단어와 섞여 있어도 단어마다 유형을 따로 정한다', () => {
+    const questions = generateQuestions([word(1, 'apple', '사과'), verbWord], {
+      mode: 'spelling',
+      shuffle: false,
+    })
+    expect(questions.map((q) => q.type)).toEqual(['spelling', 'verb'])
+  })
+
+  it('변화형 칸이 비어 있으면 일반 문제로 낸다', () => {
+    const [q] = generateQuestions([{ ...verbWord, past: '', participle: '' }], { mode: 'spelling' })
+    expect(q.type).toBe('spelling')
+  })
+})

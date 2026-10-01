@@ -23,6 +23,15 @@ import {
   updateWordSetTitle,
 } from '../lib/db'
 import { checkAnswer, formatDateTime, formatDuration, generateQuestions, type Question, type QuizWord } from '../lib/quiz'
+import { VerbAnswerFields } from '../components/VerbAnswerFields'
+import {
+  checkVerbAnswer,
+  joinVerbAnswer,
+  joinVerbForms,
+  splitVerbAnswer,
+  type VerbAnswer,
+  type VerbResult,
+} from '../lib/verbs'
 import {
   clearQuizProgress,
   loadQuizProgress,
@@ -67,13 +76,25 @@ function parseIds(raw: string): number[] {
     .filter((n) => Number.isInteger(n) && n > 0)
 }
 
+const EMPTY_VERB: VerbAnswer = { present: '', past: '', participle: '' }
+
+/** 동사 문제의 정답 세 형태. 저장된 변화형이 비어 있을 일은 없지만 방어적으로 받는다. */
+function formsOf(word: QuizWord) {
+  return { term: word.term, past: word.past ?? '', participle: word.participle ?? '' }
+}
+
 function buildAnswer(q: Question, userAnswer: string, correct: boolean): AnswerLog {
   return {
     wordId: q.word.id,
     questionType: q.type,
     term: q.word.term,
     meaning: q.word.meaning,
-    correctAnswer: q.type === 'spelling' ? q.word.term : q.word.meaning,
+    correctAnswer:
+      q.type === 'spelling'
+        ? q.word.term
+        : q.type === 'verb'
+          ? joinVerbForms(formsOf(q.word))
+          : q.word.meaning,
     userAnswer,
     correct,
   }
@@ -104,6 +125,7 @@ export function Quiz() {
   const [answers, setAnswers] = useState<(AnswerLog | null)[]>([])
   const [qIndex, setQIndex] = useState(0)
   const [answerInput, setAnswerInput] = useState('')
+  const [verbInput, setVerbInput] = useState<VerbAnswer>(EMPTY_VERB)
   const [roundStartedAt, setRoundStartedAt] = useState(0)
   const [firstRound, setFirstRound] = useState<{ correct: number; total: number } | null>(null)
   const [roundResult, setRoundResult] = useState<RoundResult | null>(null)
@@ -230,6 +252,12 @@ export function Quiz() {
   const feedback: 'idle' | 'correct' | 'wrong' =
     answers[qIndex] == null ? 'idle' : answers[qIndex]!.correct ? 'correct' : 'wrong'
   const answeredCount = answers.filter((a) => a !== null).length
+  // 칸별 정오는 화면의 입력값이 아니라 기록된 답에서 다시 센다. "모르겠어요"로 넘긴
+  // 문항도 세 칸이 모두 틀린 것으로 표시되어 정답이 보인다.
+  const verbResult =
+    currentQuestion?.type === 'verb' && answers[qIndex]
+      ? checkVerbAnswer(formsOf(currentQuestion.word), splitVerbAnswer(answers[qIndex]!.userAnswer))
+      : null
 
   function startRound(words: QuizWord[], roundNumber: number, count?: number) {
     const qs = generateQuestions(words, { count, mode: FIXED_QUESTION_TYPE, shuffle: order === 'shuffle' })
@@ -237,6 +265,7 @@ export function Quiz() {
     setAnswers(Array(qs.length).fill(null))
     setQIndex(0)
     setAnswerInput('')
+    setVerbInput(EMPTY_VERB)
     setRound(roundNumber)
     setRoundStartedAt(Date.now())
     elapsedRef.current = 0
@@ -249,11 +278,28 @@ export function Quiz() {
   function goTo(index: number) {
     const clamped = Math.max(0, Math.min(questions.length - 1, index))
     setQIndex(clamped)
-    setAnswerInput(answers[clamped]?.userAnswer ?? '')
+    const saved = answers[clamped]?.userAnswer ?? ''
+    setAnswerInput(saved)
+    // 동사 답은 "현재 | 과거 | 과거분사"로 저장돼 있으니 세 칸으로 되돌린다.
+    setVerbInput(questions[clamped]?.type === 'verb' ? splitVerbAnswer(saved) : EMPTY_VERB)
   }
 
   function submit(skip = false) {
     if (!currentQuestion) return
+    if (currentQuestion.type === 'verb') {
+      const result = skip ? null : checkVerbAnswer(formsOf(currentQuestion.word), verbInput)
+      const record = buildAnswer(
+        currentQuestion,
+        skip ? '' : joinVerbAnswer(verbInput),
+        result?.all ?? false,
+      )
+      setAnswers((prev) => {
+        const next = [...prev]
+        next[qIndex] = record
+        return next
+      })
+      return
+    }
     const correct = !skip && checkAnswer(currentQuestion, answerInput)
     const record = buildAnswer(currentQuestion, skip ? '' : answerInput, correct)
     setAnswers((prev) => {
@@ -553,14 +599,27 @@ export function Quiz() {
       </div>
 
       <div className="flex flex-1 flex-col overflow-y-auto px-[22px] py-6">
-        <SpellingQuestion
-          question={currentQuestion}
-          answer={answerInput}
-          setAnswer={setAnswerInput}
-          feedback={feedback}
-          speak={speak}
-          speakingTerm={speakingTerm}
-        />
+        {currentQuestion.type === 'verb' ? (
+          <VerbQuestion
+            question={currentQuestion}
+            answer={verbInput}
+            setAnswer={setVerbInput}
+            result={verbResult}
+            feedback={feedback}
+            onSubmit={() => submit(false)}
+            speak={speak}
+            speakingTerm={speakingTerm}
+          />
+        ) : (
+          <SpellingQuestion
+            question={currentQuestion}
+            answer={answerInput}
+            setAnswer={setAnswerInput}
+            feedback={feedback}
+            speak={speak}
+            speakingTerm={speakingTerm}
+          />
+        )}
 
         <div className="flex-1" />
 
@@ -738,6 +797,69 @@ function SpellingQuestion({ question, answer, setAnswer, feedback, speak, speaki
       </div>
 
       <FeedbackBanner feedback={feedback} correctText={`${word.term} = ${word.meaning}`} wrongText={`정답은 ${word.term} 예요`} />
+    </>
+  )
+}
+
+/** 뜻을 보여주고 현재형·과거형·과거분사형 세 칸을 받는 문제. */
+function VerbQuestion({
+  question,
+  answer,
+  setAnswer,
+  result,
+  feedback,
+  onSubmit,
+  speak,
+  speakingTerm,
+}: {
+  question: Question
+  answer: VerbAnswer
+  setAnswer: (v: VerbAnswer) => void
+  result: VerbResult | null
+  feedback: 'idle' | 'correct' | 'wrong'
+  onSubmit: () => void
+  speak: (term: string) => void
+  speakingTerm: string | null
+}) {
+  const { word } = question
+  const forms = formsOf(word)
+
+  return (
+    <>
+      <div className="flex justify-center">
+        <span className="rounded-full bg-primary-tint px-3.5 py-1.5 text-[12.5px] font-bold text-primary-dark">
+          뜻을 보고 3단 변화를 써보세요
+        </span>
+      </div>
+
+      <div className="mt-6 rounded-[22px] border border-border bg-surface p-8 text-center">
+        <div className="text-[26px] font-extrabold">{word.meaning}</div>
+        <button
+          type="button"
+          onClick={() => speak(word.term)}
+          className="mt-3.5 inline-flex items-center gap-1.5 rounded-full bg-primary-tint px-4 py-2 text-[12.5px] font-bold text-primary-dark"
+        >
+          <SpeakerIcon width={15} height={15} className={speakingTerm === word.term ? 'animate-speak' : ''} />
+          발음 듣기
+        </button>
+      </div>
+
+      <div className="mt-5">
+        <VerbAnswerFields
+          value={answer}
+          onChange={setAnswer}
+          onSubmit={onSubmit}
+          result={result}
+          correct={forms}
+          disabled={feedback !== 'idle'}
+        />
+      </div>
+
+      <FeedbackBanner
+        feedback={feedback}
+        correctText={`${word.meaning} = ${joinVerbForms(forms)}`}
+        wrongText={`정답은 ${joinVerbForms(forms)} 예요`}
+      />
     </>
   )
 }

@@ -130,3 +130,13 @@ export function joinVerbForms(v: { term: string; past: string; participle: strin
 export function joinVerbAnswer(a: VerbAnswer): string {
   return `${a.present} | ${a.past} | ${a.participle}`
 }
+
+/**
+ * joinVerbAnswer의 역함수. 저장된 답 한 줄을 세 칸으로 되돌린다.
+ * 세 칸짜리가 아니면(모르겠어요로 넘겨 빈 문자열이 저장된 경우 등) 빈 칸 셋을 준다.
+ */
+export function splitVerbAnswer(saved: string): VerbAnswer {
+  const parts = (saved ?? '').split(' | ')
+  if (parts.length !== 3) return { present: '', past: '', participle: '' }
+  return { present: parts[0], past: parts[1], participle: parts[2] }
+}
