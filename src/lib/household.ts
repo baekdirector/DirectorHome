@@ -81,9 +81,6 @@ export const deleteEntry = (id: number) => api<{ ok: true }>(`/entries/${id}`, {
 
 export const getSettings = () => api<ExpenseSettings | null>('/settings')
 
-export const putSettings = (input: ExpenseSettings) =>
-  api<{ ok: true }>('/settings', { method: 'PUT', body: JSON.stringify(input) })
-
 export const getSummary = (year: number) => api<ExpenseSummary>(`/summary?year=${year}`)
 
 export const verifyPassword = (password: string) =>
@@ -105,9 +102,4 @@ export function isAccessTokenValid(storedUntil: string | null, now: number): boo
   if (!storedUntil) return false
   const until = Number(storedUntil)
   return Number.isFinite(until) && until > now
-}
-
-/** summary.months에서 해당 월을 찾는다. 데이터가 없는 연도로 전환해도 undefined만 반환하고 던지지 않는다. */
-export function findMonthSummary(summary: ExpenseSummary, month: number): ExpenseMonthSummary | undefined {
-  return summary.months.find((m) => m.month === month)
 }

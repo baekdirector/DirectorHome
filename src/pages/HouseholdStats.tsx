@@ -147,7 +147,7 @@ function StatsContent() {
             className="flex h-10 items-center gap-1.5 rounded-full border border-hh-border bg-white px-3.5 text-[14px] font-semibold lg:h-11 lg:rounded-xl lg:px-4 lg:font-bold"
           >
             {year}년
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#1E2B27" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" className="stroke-hh-ink" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
               <path d="m6 9 6 6 6-6" />
             </svg>
           </button>
@@ -243,7 +243,7 @@ function StatsContent() {
               </div>
               <div className="-mt-2.5 flex gap-2">
                 {spends.map((_, i) => (
-                  <div key={i} className={`flex-1 text-center text-[11px] ${i === currentMonthIdx ? 'font-bold text-hh-ink' : 'text-[#8A877E]'}`}>
+                  <div key={i} className={`flex-1 text-center text-[11px] ${i === currentMonthIdx ? 'font-bold text-hh-ink' : 'text-hh-label'}`}>
                     {i + 1}월
                   </div>
                 ))}
@@ -267,7 +267,7 @@ function StatsContent() {
                       type="button"
                       onClick={() => setSelectedCardId((prev) => (prev === cat.id ? null : cat.id))}
                       className="flex items-center gap-1.5 text-[12px]"
-                      style={{ color: selectedCardId === null || selectedCardId === cat.id ? '#4A4A44' : '#B3AEA3', fontWeight: selectedCardId === cat.id ? 700 : 400 }}
+                      style={{ color: selectedCardId === null || selectedCardId === cat.id ? 'var(--color-hh-ink-soft)' : 'var(--color-hh-neutral)', fontWeight: selectedCardId === cat.id ? 700 : 400 }}
                     >
                       <div className="h-2.5 w-2.5 rounded-[3px]" style={{ background: color, opacity: selectedCardId === null || selectedCardId === cat.id ? 1 : 0.35 }} />
                       {cat.name}
@@ -295,7 +295,7 @@ function StatsContent() {
                     </div>
                     <div className="-mt-2.5 flex gap-2">
                       {spends.map((_, i) => (
-                        <div key={i} className={`flex-1 text-center text-[11px] ${i === currentMonthIdx ? 'font-bold text-hh-ink' : 'text-[#8A877E]'}`}>
+                        <div key={i} className={`flex-1 text-center text-[11px] ${i === currentMonthIdx ? 'font-bold text-hh-ink' : 'text-hh-label'}`}>
                           {i + 1}월
                         </div>
                       ))}
@@ -327,7 +327,7 @@ function StatsContent() {
                   <div className="flex gap-2.5 text-[11px] text-hh-ink-muted">
                     {recentMonths.map((m, i) => (
                       <div key={m} className="flex items-center gap-1">
-                        <div className="h-2.5 w-2.5 rounded-[3px]" style={{ background: '#22433B', opacity: monthOpacity(i, recentMonths.length) }} />
+                        <div className="h-2.5 w-2.5 rounded-[3px]" style={{ background: 'var(--color-hh-pine)', opacity: monthOpacity(i, recentMonths.length) }} />
                         {m}월
                       </div>
                     ))}
@@ -369,7 +369,7 @@ function StatsContent() {
             <div className="font-hh-serif text-[18px] font-bold">항목별 월별 수입</div>
             <div className="flex flex-wrap gap-x-3.5 gap-y-2">
               {INCOME_BUCKETS.map((name, i) => (
-                <div key={name} className="flex items-center gap-1.5 text-[12px] text-[#4A4A44]">
+                <div key={name} className="flex items-center gap-1.5 text-[12px] text-hh-ink-soft">
                   <div className="h-2.5 w-2.5 rounded-[3px]" style={{ background: INCOME_PALETTE[i] }} />
                   {name}
                 </div>
@@ -396,7 +396,7 @@ function StatsContent() {
             </div>
             <div className="-mt-2.5 flex gap-2">
               {Array.from({ length: 12 }, (_, i) => i + 1).map((m) => (
-                <div key={m} className="flex-1 text-center text-[11px] text-[#8A877E]">
+                <div key={m} className="flex-1 text-center text-[11px] text-hh-label">
                   {m}월
                 </div>
               ))}
@@ -472,7 +472,7 @@ function SingleCardLineChart({
           <line x1="0" y1="18.75" x2="310" y2="18.75" stroke="#F1ECE3" strokeWidth="1" />
           <line x1="0" y1="62.5" x2="310" y2="62.5" stroke="#F1ECE3" strokeWidth="1" />
           <line x1="0" y1="106.25" x2="310" y2="106.25" stroke="#F1ECE3" strokeWidth="1" />
-          <line x1="0" y1="150" x2="310" y2="150" stroke="#ECE6DC" strokeWidth="1" />
+          <line x1="0" y1="150" x2="310" y2="150" strokeWidth="1" className="stroke-hh-divider" />
           {selectedIdx >= 0 && (
             <line x1={pts[selectedIdx][0]} y1="0" x2={pts[selectedIdx][0]} y2="150" stroke={color} strokeWidth="1" strokeDasharray="3 3" opacity={0.4} />
           )}
@@ -501,8 +501,8 @@ function SingleCardLineChart({
             />
           ))}
         </svg>
-        <div className="absolute left-0 top-[10px] text-[10px] text-[#8A877E]">{man(0.75 * maxY)}</div>
-        <div className="absolute left-0 top-[98px] text-[10px] text-[#8A877E]">{man(0.25 * maxY)}</div>
+        <div className="absolute left-0 top-[10px] text-[10px] text-hh-label">{man(0.75 * maxY)}</div>
+        <div className="absolute left-0 top-[98px] text-[10px] text-hh-label">{man(0.25 * maxY)}</div>
       </div>
       <div className="flex gap-2">
         {values.map((_, i) => (
@@ -510,7 +510,7 @@ function SingleCardLineChart({
             key={i}
             type="button"
             onClick={() => setSelectedIdx(i)}
-            className={`flex-1 border-none bg-transparent text-center text-[11px] ${i === selectedIdx ? 'font-bold text-hh-ink' : 'text-[#8A877E]'}`}
+            className={`flex-1 border-none bg-transparent text-center text-[11px] ${i === selectedIdx ? 'font-bold text-hh-ink' : 'text-hh-label'}`}
           >
             {i + 1}월
           </button>
@@ -551,12 +551,12 @@ function BalanceChart({ balances, currentMonthIdx }: { balances: number[]; curre
           <line x1="0" y1="18.75" x2="310" y2="18.75" stroke="#F1ECE3" strokeWidth="1" />
           <line x1="0" y1="62.5" x2="310" y2="62.5" stroke="#F1ECE3" strokeWidth="1" />
           <line x1="0" y1="106.25" x2="310" y2="106.25" stroke="#F1ECE3" strokeWidth="1" />
-          <line x1="0" y1="150" x2="310" y2="150" stroke="#ECE6DC" strokeWidth="1" />
-          {areaD && <path d={areaD} fill="#8FAE9E" fillOpacity="0.22" />}
-          {d && <path d={d} fill="none" stroke="#22433B" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />}
+          <line x1="0" y1="150" x2="310" y2="150" strokeWidth="1" className="stroke-hh-divider" />
+          {areaD && <path d={areaD} fillOpacity="0.22" className="fill-hh-sage" />}
+          {d && <path d={d} fill="none" strokeWidth="2.5" className="stroke-hh-pine" strokeLinecap="round" strokeLinejoin="round" />}
         </svg>
-        <div className="absolute left-0 top-[10px] text-[10px] text-[#8A877E]">{man(0.75 * Math.max(...balances, 1) * 1.15)}</div>
-        <div className="absolute left-0 top-[98px] text-[10px] text-[#8A877E]">{man(0.25 * Math.max(...balances, 1) * 1.15)}</div>
+        <div className="absolute left-0 top-[10px] text-[10px] text-hh-label">{man(0.75 * Math.max(...balances, 1) * 1.15)}</div>
+        <div className="absolute left-0 top-[98px] text-[10px] text-hh-label">{man(0.25 * Math.max(...balances, 1) * 1.15)}</div>
       </div>
       <div className="flex justify-between text-[11px] text-hh-ink-muted">
         {[1, 3, 5, 7, 9, 11].map((m) => (

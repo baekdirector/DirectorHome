@@ -31,7 +31,9 @@ export default defineConfig({
       workbox: {
         globPatterns: ['**/*.{js,css,html,png,svg,ico,woff2}'],
         // 공유 미리보기 이미지는 앱이 쓰지 않으므로 오프라인 캐시에 넣지 않는다.
-        globIgnores: ['og-image.png'],
+        // pdf 청크도 제외한다 -- 실제 파서인 pdf.worker.min-*.mjs는 glob에 걸리지 않아
+        // 오프라인에서는 어차피 동작하지 않는데, 청크만 설치 시 다운로드량을 키운다.
+        globIgnores: ['og-image.png', 'assets/pdf-*.js'],
         runtimeCaching: [
           {
             urlPattern: /^https:\/\/fonts\.googleapis\.com\/.*/i,

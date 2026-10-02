@@ -26,8 +26,16 @@ registerSW({
     if (!registration) return
     // 설치형 앱은 탭을 닫지 않으므로 브라우저가 스스로 새 버전을 찾아보기까지 오래 걸린다.
     // 앱이 화면으로 돌아올 때마다 직접 확인한다.
+    // visibilitychange와 focus가 같은 복귀에 둘 다 발화하므로, 짧은 간격의 중복 호출은 건너뛴다.
+    // registration.update()는 HTTP 캐시를 우회해 sw.js를 매번 새로 받아온다.
+    const MIN_INTERVAL_MS = 15 * 60 * 1000
+    let lastCheckedAt = 0
     const checkForUpdate = () => {
-      if (document.visibilityState === 'visible') void registration.update()
+      if (document.visibilityState !== 'visible') return
+      const now = Date.now()
+      if (now - lastCheckedAt < MIN_INTERVAL_MS) return
+      lastCheckedAt = now
+      void registration.update()
     }
     document.addEventListener('visibilitychange', checkForUpdate)
     window.addEventListener('focus', checkForUpdate)

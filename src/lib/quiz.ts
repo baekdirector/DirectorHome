@@ -3,9 +3,6 @@ import type { QuestionType, WordRecord } from './db'
 
 export type { QuestionType }
 
-/** 시험 유형: 한 가지 유형만 내거나 ('mixed'는 문제마다 무작위) */
-export type QuizMode = QuestionType | 'mixed'
-
 export type QuizWord = WordRecord
 
 export interface Question {
@@ -25,7 +22,8 @@ function shuffle<T>(arr: T[]): T[] {
 export interface GenerateOptions {
   /** 출제할 문제 수. 생략하면 전체 단어. */
   count?: number
-  mode?: QuizMode
+  /** 출제할 문항 유형. 변화형이 저장된 단어는 유형과 무관하게 'verb'로 낸다. */
+  mode: QuestionType
   /** true(기본)면 무작위 순서, false면 단어장에 적힌 순서대로. */
   shuffle?: boolean
 }
@@ -41,24 +39,14 @@ export function isVerbWord(word: QuizWord): boolean {
 /** Picks `count` words (all by default), one question each. Random order unless `shuffle` is false. */
 export function generateQuestions(
   words: QuizWord[],
-  { count, mode = 'mixed', shuffle: shuffled = true }: GenerateOptions = {},
+  { count, mode, shuffle: shuffled = true }: GenerateOptions,
 ): Question[] {
   const ordered = shuffled ? shuffle(words) : words
   const picked = count === undefined ? ordered : ordered.slice(0, Math.max(0, count))
   return picked.map((word) => ({
     word,
-    type: isVerbWord(word)
-      ? 'verb'
-      : mode === 'mixed'
-        ? Math.random() < 0.5
-          ? 'spelling'
-          : 'meaning'
-        : mode,
+    type: isVerbWord(word) ? 'verb' : mode,
   }))
-}
-
-export function normalizeAnswer(s: string): string {
-  return s.trim().toLowerCase().replace(/\s+/g, ' ')
 }
 
 // 띄어쓰기, 기호("...", "~", 하이픈 등) 차이는 정답 판정에서 무시한다.

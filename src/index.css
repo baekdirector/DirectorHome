@@ -34,17 +34,16 @@
   --color-hh-sidebar: #EFE8DE;
   --color-hh-ink: #1E2B27;
   --color-hh-ink-muted: #6B6A63;
+  /* 본문보다 한 톤 흐린 값/축 라벨용. 여러 화면에서 반복되던 하드코딩 색. */
+  --color-hh-ink-soft: #4A4A44;
+  --color-hh-label: #8A877E;
   --color-hh-border: #E4DDD1;
   --color-hh-pine: #22433B;
   --color-hh-pine-tint: #E3ECE6;
   --color-hh-clay: #C06A3E;
-  --color-hh-clay-tint: #F3E4D8;
   --color-hh-sage: #8FAE9E;
-  --color-hh-sage-tint: #E4EEE7;
   --color-hh-tan: #D9C39C;
-  --color-hh-tan-tint: #F4EEE2;
   --color-hh-gold: #B98A3D;
-  --color-hh-gold-tint: #F4E9D2;
   --color-hh-neutral: #B3AEA3;
   --color-hh-divider: #ECE6DC;
   /* OPIC 전용. 가계부(--color-hh-*)와 섞지 않는다. */
@@ -57,7 +56,6 @@
   --color-op-accent-tint: #E6E9FB;
   --color-op-eva: #9A3B6E;
   --color-op-eva-tint: #F8EDF3;
-  --color-op-marker: #FFE27A;
   /* 암기 상태 3색. 명도가 서로 달라 색약에서도 구분되지만 항상 글자와 함께 쓴다. */
   --color-op-done: #15803D;
   --color-op-ok: #D69E2E;

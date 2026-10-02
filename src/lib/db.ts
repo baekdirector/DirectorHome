@@ -84,10 +84,6 @@ export function getWordSet(wordSetId: number): Promise<WordSetRecord | undefined
   return api(`/wordsets/${wordSetId}`)
 }
 
-export function getLatestWordSet(): Promise<WordSetRecord | undefined> {
-  return api('/wordsets/latest')
-}
-
 export function updateWordSetTitle(wordSetId: number, title: string): Promise<void> {
   return api(`/wordsets/${wordSetId}`, { method: 'PATCH', body: JSON.stringify({ title }) })
 }
@@ -141,15 +137,12 @@ export interface AttemptSummary {
   groupId: string
   wordSetId: number | null
   wordSetTitle: string
-  firstRoundSessionId: number
   startedAt: number
-  lastFinishedAt: number
   totalQuestions: number
   correctCount: number
   wrongCount: number
   accuracy: number
   totalDurationMs: number
-  roundsTaken: number
   mastered: boolean
 }
 
@@ -167,7 +160,6 @@ export function getMissedWordCounts(limit = 5): Promise<Array<{ term: string; me
 
 export interface HomeStats {
   totalWords: number
-  totalAttempts: number
   weeklyAccuracy: number
   streakDays: number
   /** 오답 노트에 남아 있는(아직 못 외운) 단어 수 */

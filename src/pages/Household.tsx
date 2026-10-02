@@ -33,11 +33,11 @@ const GROUP_LABEL: Record<ExpenseGroup, string> = {
   variable: '기타변동',
 }
 const GROUP_COLOR: Record<ExpenseGroup, string> = {
-  income: '#8FAE9E',
-  fixed: '#C06A3E',
-  card: '#22433B',
-  utility: '#D9C39C',
-  variable: '#B3AEA3',
+  income: 'var(--color-hh-sage)',
+  fixed: 'var(--color-hh-clay)',
+  card: 'var(--color-hh-pine)',
+  utility: 'var(--color-hh-tan)',
+  variable: 'var(--color-hh-neutral)',
 }
 // 카드사 개별 구분용(그룹 색과 겹치지 않도록 별도 팔레트 — dataviz 스킬 validate_palette.js로 검증됨).
 const CARD_ORDER = ['현대카드', '신한카드', '우리카드', '삼성카드']
@@ -94,7 +94,7 @@ function HouseholdContent() {
     setCategoriesFailed(false)
     try {
       setCategories(await getCategories())
-    } catch (e) {
+    } catch {
       setCategoriesFailed(true)
     }
   }
@@ -108,7 +108,7 @@ function HouseholdContent() {
       setEntries(entriesData)
       setSummary(summaryData.months)
       setOpeningBalance(summaryData.openingBalance)
-    } catch (e) {
+    } catch {
       if (entriesRequestIdRef.current !== requestId) return
       setEntriesFailed(true)
     }
@@ -210,7 +210,7 @@ function HouseholdContent() {
       stops.push(`${g.color} ${acc.toFixed(2)}% ${(acc + pct).toFixed(2)}%`)
       acc += pct
     }
-    return { groups, total, donutBg: stops.length ? `conic-gradient(${stops.join(', ')})` : '#ECE6DC' }
+    return { groups, total, donutBg: stops.length ? `conic-gradient(${stops.join(', ')})` : 'var(--color-hh-divider)' }
   }, [categories, sumsByCategoryMonth, month])
 
   const cardStats = useMemo(() => {
@@ -240,7 +240,7 @@ function HouseholdContent() {
       await navigator.clipboard.writeText(formatWon(wifeCardsTotal))
       setCopied(true)
       setTimeout(() => setCopied(false), 1500)
-    } catch (e) {
+    } catch {
       // 클립보드 API를 못 쓰는 환경이면 조용히 무시한다.
     }
   }
@@ -323,7 +323,7 @@ function HouseholdContent() {
             onClick={() => goMonth(-1)}
             className="flex h-11 w-11 items-center justify-center rounded-full lg:order-first lg:h-11 lg:w-11 lg:rounded-xl lg:border lg:border-hh-border lg:bg-white"
           >
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#1E2B27" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" className="stroke-hh-ink" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="m15 6-6 6 6 6" />
             </svg>
           </button>
@@ -343,7 +343,7 @@ function HouseholdContent() {
             onClick={() => goMonth(1)}
             className="flex h-11 w-11 items-center justify-center rounded-full lg:h-11 lg:w-11 lg:rounded-xl lg:border lg:border-hh-border lg:bg-white"
           >
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#1E2B27" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" className="stroke-hh-ink" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="m9 6 6 6-6 6" />
             </svg>
           </button>
@@ -376,8 +376,8 @@ function HouseholdContent() {
           {income > 0 && (
             <div className="flex flex-col gap-2">
               <div className="flex h-2.5 gap-[3px] overflow-hidden rounded-full">
-                <div className="rounded-full bg-[#C06A3E]" style={{ width: `${spendPct}%` }} />
-                <div className="flex-1 rounded-full bg-[#8FAE9E]" />
+                <div className="rounded-full bg-hh-clay" style={{ width: `${spendPct}%` }} />
+                <div className="flex-1 rounded-full bg-hh-sage" />
               </div>
               <div className="flex justify-between text-[12px] text-[#CFDDD5]">
                 <div>수입의 {spendPct.toFixed(1)}% 사용</div>
@@ -521,9 +521,9 @@ function HouseholdContent() {
             <div className="flex items-center justify-between px-3 py-2.5 lg:border-b lg:border-hh-divider lg:px-0 lg:pt-0">
               <div className="flex items-center gap-2">
                 <div className="h-2 w-2 rounded-full" style={{ background: s.color }} />
-                <div className="text-[13px] font-semibold text-[#4A4A44] lg:text-[14px] lg:font-bold lg:text-hh-ink">{s.title}</div>
+                <div className="text-[13px] font-semibold text-hh-ink-soft lg:text-[14px] lg:font-bold lg:text-hh-ink">{s.title}</div>
               </div>
-              <div className="text-[13px] font-semibold lg:text-[14px] lg:font-bold" style={{ color: s.group === 'income' ? 'var(--color-hh-down)' : '#1E2B27' }}>
+              <div className="text-[13px] font-semibold lg:text-[14px] lg:font-bold" style={{ color: s.group === 'income' ? 'var(--color-hh-down)' : 'var(--color-hh-ink)' }}>
                 {s.group === 'income' ? '+' : '−'}
                 {formatWon(s.total)}
               </div>
@@ -549,7 +549,7 @@ function HouseholdContent() {
                   <div className="text-[15px] lg:text-[14px]">{cat.name}</div>
                   <div className="flex items-center gap-2">
                     <div className="text-[15px] font-semibold lg:text-[14px]">{formatWon(sumFor(cat.id, month))}</div>
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#B3AEA3" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lg:hidden">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="stroke-hh-neutral lg:hidden">
                       <path d="m9 6 6 6-6 6" />
                     </svg>
                   </div>
@@ -745,7 +745,7 @@ function ItemizedRow({
             height="16"
             viewBox="0 0 24 24"
             fill="none"
-            stroke="#B3AEA3"
+            className="stroke-hh-neutral"
             strokeWidth="2"
             strokeLinecap="round"
             strokeLinejoin="round"

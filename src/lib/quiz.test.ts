@@ -19,29 +19,29 @@ const words = [word(1, 'apple', '사과'), word(2, 'run', '달리다, 운영하�
 
 describe('generateQuestions', () => {
   it('count를 생략하면 모든 단어를 한 번씩 출제한다', () => {
-    const questions = generateQuestions(words)
+    const questions = generateQuestions(words, { mode: 'spelling' })
     expect(questions.map((q) => q.word.id).sort()).toEqual([1, 2, 3])
   })
 
   it('count만큼만 중복 없이 출제한다', () => {
-    const questions = generateQuestions(words, { count: 2 })
+    const questions = generateQuestions(words, { mode: 'spelling', count: 2 })
     expect(questions).toHaveLength(2)
     expect(new Set(questions.map((q) => q.word.id)).size).toBe(2)
   })
 
   it('단어 수보다 많이 요청해도 있는 만큼만 출제한다', () => {
-    expect(generateQuestions(words, { count: 10 })).toHaveLength(3)
+    expect(generateQuestions(words, { mode: 'spelling', count: 10 })).toHaveLength(3)
   })
 
   it('shuffle을 끄면 단어장 순서대로 앞에서부터 출제한다', () => {
-    const questions = generateQuestions(words, { shuffle: false, count: 2 })
+    const questions = generateQuestions(words, { mode: 'spelling', shuffle: false, count: 2 })
     expect(questions.map((q) => q.word.id)).toEqual([1, 2])
-    expect(generateQuestions(words, { shuffle: false }).map((q) => q.word.id)).toEqual([1, 2, 3])
+    expect(generateQuestions(words, { mode: 'spelling', shuffle: false }).map((q) => q.word.id)).toEqual([1, 2, 3])
   })
 
   it('shuffle을 켜면(기본) 모든 단어가 한 번씩, 순서만 무작위다', () => {
     const many = Array.from({ length: 30 }, (_, i) => word(i + 1, `w${i}`, '뜻'))
-    const ids = generateQuestions(many).map((q) => q.word.id)
+    const ids = generateQuestions(many, { mode: 'spelling' }).map((q) => q.word.id)
     expect([...ids].sort((a, b) => a - b)).toEqual(many.map((w) => w.id))
     expect(ids).not.toEqual(many.map((w) => w.id))
   })

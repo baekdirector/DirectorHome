@@ -26,15 +26,12 @@ function summarizeAttempts(sessions) {
       groupId,
       wordSetId: first.wordSetId,
       wordSetTitle: first.wordSetTitle,
-      firstRoundSessionId: first.id,
       startedAt: first.startedAt,
-      lastFinishedAt: last.finishedAt,
       totalQuestions: first.totalQuestions,
       correctCount: first.correctCount,
       wrongCount: first.wrongCount,
       accuracy: first.totalQuestions > 0 ? Math.round((first.correctCount / first.totalQuestions) * 100) : 0,
       totalDurationMs: rounds.reduce((sum, r) => sum + r.durationMs, 0),
-      roundsTaken: rounds.length,
       mastered: rounds.some((r) => r.wrongCount === 0),
     })
   }
@@ -99,13 +96,6 @@ router.get('/wordsets', async (_req, res) => {
     ORDER BY ws.created_at DESC
   `)
   res.json(rows)
-})
-
-router.get('/wordsets/latest', async (_req, res) => {
-  const { rows } = await pool.query(
-    `SELECT id, title, created_at AS "createdAt" FROM word_sets ORDER BY created_at DESC LIMIT 1`,
-  )
-  res.json(rows[0] ?? null)
 })
 
 router.get('/wordsets/attempt-counts', async (_req, res) => {
@@ -518,7 +508,7 @@ router.get('/home-stats', async (_req, res) => {
     rows: [{ count: wrongNoteCount }],
   } = await pool.query(`SELECT COUNT(*)::int AS count FROM wrong_notes WHERE resolved_at IS NULL`)
 
-  res.json({ totalWords, totalAttempts: attempts.length, weeklyAccuracy, streakDays, wrongNoteCount })
+  res.json({ totalWords, weeklyAccuracy, streakDays, wrongNoteCount })
 })
 
 // ---- household expense tracker ----
@@ -652,20 +642,6 @@ router.get('/expense/settings', async (_req, res) => {
      FROM expense_settings WHERE id = 1`,
   )
   res.json(rows[0] ?? null)
-})
-
-router.put('/expense/settings', async (req, res) => {
-  const { openingYear, openingMonth, openingBalance } = req.body
-  if (!openingYear || !openingMonth) return res.status(400).json({ error: 'openingYear and openingMonth required' })
-  await pool.query(
-    `INSERT INTO expense_settings (id, opening_year, opening_month, opening_balance, updated_at)
-     VALUES (1, $1, $2, $3, $4)
-     ON CONFLICT (id) DO UPDATE SET
-       opening_year = EXCLUDED.opening_year, opening_month = EXCLUDED.opening_month,
-       opening_balance = EXCLUDED.opening_balance, updated_at = EXCLUDED.updated_at`,
-    [openingYear, openingMonth, openingBalance ?? 0, Date.now()],
-  )
-  res.json({ ok: true })
 })
 
 /**
