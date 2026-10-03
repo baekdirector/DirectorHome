@@ -9,7 +9,9 @@ import { TestSelect } from './pages/TestSelect'
 import { WrongNotes } from './pages/WrongNotes'
 import { ParentDashboard } from './pages/ParentDashboard'
 import { ParentSessionDetail } from './pages/ParentSessionDetail'
-import { Admin } from './pages/Admin'
+import { Admin, AdminHomework } from './pages/Admin'
+import { AdminPasswords } from './pages/AdminPasswords'
+import { AdminWordSets } from './pages/AdminWordSets'
 import { HouseholdBackGuard } from './components/HouseholdBackGuard'
 import { ProfileGate } from './components/ProfileGate'
 import { Loading } from './components/Loading'
@@ -46,7 +48,11 @@ function App() {
           <Route path="/wrong/quiz" element={<Quiz />} />
           <Route path="/parent" element={<ParentDashboard />} />
           <Route path="/parent/session/:groupId" element={<ParentSessionDetail />} />
-          <Route path="/admin" element={<Admin />} />
+          <Route path="/admin" element={<Admin />}>
+            <Route index element={<AdminHomework />} />
+            <Route path="wordsets" element={<AdminWordSets />} />
+            <Route path="passwords" element={<AdminPasswords />} />
+          </Route>
           <Route
             element={
               <Suspense fallback={<Loading screen />}>
