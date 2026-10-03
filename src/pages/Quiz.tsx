@@ -26,7 +26,15 @@ import {
   updateWordSetTitle,
   type HomeworkRecord,
 } from '../lib/db'
-import { checkAnswer, formatDateTime, formatDuration, generateQuestions, type Question, type QuizWord } from '../lib/quiz'
+import {
+  checkAnswer,
+  formatDateTime,
+  formatDuration,
+  generateQuestions,
+  hasAttempted,
+  type Question,
+  type QuizWord,
+} from '../lib/quiz'
 import { VerbAnswerFields } from '../components/VerbAnswerFields'
 import { VerbAnswerCells } from '../components/VerbAnswerCells'
 import {
@@ -313,7 +321,12 @@ export function Quiz() {
     answers[qIndex] == null ? 'idle' : answers[qIndex]!.correct ? 'correct' : 'wrong'
   const answeredCount = answers.filter((a) => a !== null).length
   // 칸별 정오는 화면의 입력값이 아니라 기록된 답에서 다시 센다. "모르겠어요"로 넘긴
-  // 문항도 세 칸이 모두 틀린 것으로 표시되어 정답이 보인다.
+  // 문항은 세 칸이 모두 틀린 것으로 표시된다(정답은 아래 revealAnswer가 막는다).
+  // 정답은 실제로 뭔가 써서 틀렸을 때만 보여준다. "모르겠어요"로 넘겼거나 빈 칸으로 확인을
+  // 누른 문항은 되돌아와도 빨간 표시만 남는다 -- 풀지 않고 답만 확인하는 길을 막는다.
+  const recorded = answers[qIndex]
+  const revealAnswer =
+    feedback === 'wrong' && !!recorded && hasAttempted(recorded.questionType, recorded.userAnswer)
   const verbResult =
     currentQuestion?.type === 'verb' && answers[qIndex]
       ? checkVerbAnswer(formsOf(currentQuestion.word), splitVerbAnswer(answers[qIndex]!.userAnswer))
@@ -344,31 +357,36 @@ export function Quiz() {
     setVerbInput(questions[clamped]?.type === 'verb' ? splitVerbAnswer(saved) : EMPTY_VERB)
   }
 
-  function submit(skip = false) {
+  /** "확인". 쓴 답을 채점해 기록한다. 넘기기는 skipQuestion이 맡는다. */
+  function submit() {
     if (!currentQuestion) return
+    let record: AnswerLog
     if (currentQuestion.type === 'verb') {
       // 현재형은 문제로 주어진 칸이라 사용자가 쓴 값이 아니라 단어 그대로 채점한다.
       const typed = { ...verbInput, present: currentQuestion.word.term }
-      const result = skip ? null : checkVerbAnswer(formsOf(currentQuestion.word), typed)
-      const record = buildAnswer(
-        currentQuestion,
-        skip ? '' : joinVerbAnswer(typed),
-        result?.all ?? false,
-      )
-      setAnswers((prev) => {
-        const next = [...prev]
-        next[qIndex] = record
-        return next
-      })
+      const result = checkVerbAnswer(formsOf(currentQuestion.word), typed)
+      record = buildAnswer(currentQuestion, joinVerbAnswer(typed), result.all)
+    } else {
+      record = buildAnswer(currentQuestion, answerInput, checkAnswer(currentQuestion, answerInput))
+    }
+    setAnswers((prev) => prev.map((a, i) => (i === qIndex ? record : a)))
+  }
+
+  /**
+   * "모르겠어요". 오답으로 기록하고 정답을 보여주지 않은 채 바로 다음 문제로 넘어간다.
+   * 머무르면서 정답을 보여주면 모르는 문제를 풀어보지 않고 답만 확인하는 길이 된다.
+   */
+  function skipQuestion() {
+    if (!currentQuestion) return
+    const nextAnswers = answers.map((a, i) => (i === qIndex ? buildAnswer(currentQuestion, '', false) : a))
+    setAnswers(nextAnswers)
+    if (qIndex < questions.length - 1) {
+      goTo(qIndex + 1)
       return
     }
-    const correct = !skip && checkAnswer(currentQuestion, answerInput)
-    const record = buildAnswer(currentQuestion, skip ? '' : answerInput, correct)
-    setAnswers((prev) => {
-      const next = [...prev]
-      next[qIndex] = record
-      return next
-    })
+    // 마지막 문항이었다면 마치기로 이어진다. answers 상태는 아직 갱신 전이라 방금 만든 배열로 판단한다.
+    if (nextAnswers.every((a) => a !== null)) finishWith(nextAnswers)
+    else setFinishDialogOpen(true)
   }
 
   function handleNext() {
@@ -388,8 +406,12 @@ export function Quiz() {
   }
 
   function doFinish() {
+    finishWith(answers)
+  }
+
+  function finishWith(source: (AnswerLog | null)[]) {
     setFinishDialogOpen(false)
-    const finalAnswers = questions.map((q, i) => answers[i] ?? buildAnswer(q, '', false))
+    const finalAnswers = questions.map((q, i) => source[i] ?? buildAnswer(q, '', false))
     finishRound(finalAnswers)
   }
 
@@ -716,7 +738,8 @@ export function Quiz() {
             setAnswer={setVerbInput}
             result={verbResult}
             feedback={feedback}
-            onSubmit={() => submit(false)}
+            revealAnswer={revealAnswer}
+            onSubmit={submit}
             speak={speak}
             speakingTerm={speakingTerm}
           />
@@ -726,6 +749,7 @@ export function Quiz() {
             answer={answerInput}
             setAnswer={setAnswerInput}
             feedback={feedback}
+            revealAnswer={revealAnswer}
             speak={speak}
             speakingTerm={speakingTerm}
           />
@@ -737,14 +761,14 @@ export function Quiz() {
           <div className="flex gap-2.5">
             <button
               type="button"
-              onClick={() => submit(false)}
+              onClick={submit}
               className="flex-1 rounded-2xl bg-primary p-[15px] text-[15.5px] font-bold text-white"
             >
               확인
             </button>
             <button
               type="button"
-              onClick={() => submit(true)}
+              onClick={skipQuestion}
               className="flex-none rounded-2xl border border-border bg-surface px-4 text-[13.5px] font-semibold text-ink-muted"
             >
               모르겠어요
@@ -848,11 +872,13 @@ interface QuestionProps {
   answer: string
   setAnswer: (v: string) => void
   feedback: 'idle' | 'correct' | 'wrong'
+  /** 틀렸을 때 정답을 보여줄지. "모르겠어요"로 넘긴 문항에서는 false. */
+  revealAnswer: boolean
   speak: (term: string) => void
   speakingTerm: string | null
 }
 
-function SpellingQuestion({ question, answer, setAnswer, feedback, speak, speakingTerm }: QuestionProps) {
+function SpellingQuestion({ question, answer, setAnswer, feedback, revealAnswer, speak, speakingTerm }: QuestionProps) {
   const { word } = question
   const showHintBoxes = !word.term.includes(' ')
 
@@ -906,7 +932,11 @@ function SpellingQuestion({ question, answer, setAnswer, feedback, speak, speaki
         />
       </div>
 
-      <FeedbackBanner feedback={feedback} correctText={`${word.term} = ${word.meaning}`} wrongText={`정답은 ${word.term} 예요`} />
+      <FeedbackBanner
+        feedback={feedback}
+        correctText={`${word.term} = ${word.meaning}`}
+        wrongText={revealAnswer ? `정답은 ${word.term} 예요` : null}
+      />
     </>
   )
 }
@@ -918,6 +948,7 @@ function VerbQuestion({
   setAnswer,
   result,
   feedback,
+  revealAnswer,
   onSubmit,
   speak,
   speakingTerm,
@@ -927,6 +958,8 @@ function VerbQuestion({
   setAnswer: (v: VerbAnswer) => void
   result: VerbResult | null
   feedback: 'idle' | 'correct' | 'wrong'
+  /** 틀렸을 때 정답을 보여줄지. "모르겠어요"로 넘긴 문항에서는 false. */
+  revealAnswer: boolean
   onSubmit: () => void
   speak: (term: string) => void
   speakingTerm: string | null
@@ -961,6 +994,7 @@ function VerbQuestion({
           onSubmit={onSubmit}
           result={result}
           correct={forms}
+          revealAnswer={revealAnswer}
           disabled={feedback !== 'idle'}
         />
       </div>
@@ -968,7 +1002,7 @@ function VerbQuestion({
       <FeedbackBanner
         feedback={feedback}
         correctText={`${word.meaning} = ${joinVerbForms(forms)}`}
-        wrongText={`정답은 ${joinVerbForms(forms)} 예요`}
+        wrongText={revealAnswer ? `정답은 ${joinVerbForms(forms)} 예요` : null}
       />
     </>
   )
@@ -981,7 +1015,8 @@ function FeedbackBanner({
 }: {
   feedback: 'idle' | 'correct' | 'wrong'
   correctText: string
-  wrongText: string
+  /** null이면 정답을 숨긴다("모르겠어요"로 넘긴 문항). */
+  wrongText: string | null
 }) {
   if (feedback === 'idle') return null
   if (feedback === 'correct') {
@@ -995,7 +1030,9 @@ function FeedbackBanner({
   return (
     <div className="mt-4 flex items-center gap-2.5 rounded-2xl bg-error-tint p-4">
       <XCircleIcon width={20} height={20} className="flex-none text-error" />
-      <span className="text-[13.5px] font-bold text-error">아쉬워요! {wrongText}</span>
+      <span className="text-[13.5px] font-bold text-error">
+        {wrongText === null ? '모르겠어요로 넘긴 문제예요' : `아쉬워요! ${wrongText}`}
+      </span>
     </div>
   )
 }

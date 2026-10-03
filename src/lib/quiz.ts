@@ -1,5 +1,6 @@
 // 문항 유형은 기록으로 저장되는 값이라 db.ts 하나만을 출처로 삼는다.
 import type { QuestionType, WordRecord } from './db'
+import { splitVerbAnswer } from './verbs'
 
 export type { QuestionType }
 
@@ -32,6 +33,21 @@ export interface GenerateOptions {
  * 변화형이 저장된 단어인지. 유형은 단어장이 아니라 단어를 보고 정한다 — 한 시험에
  * 여러 단어장을 섞어 고를 수 있고, 오답 노트 시험에는 단어장이 아예 없기 때문이다.
  */
+/**
+ * 기록된 답에 실제로 쓴 내용이 있는지. 시험 화면은 이 값이 true일 때만 정답을 보여준다.
+ * "모르겠어요"로 넘겼거나 빈 칸으로 확인을 누른 문항까지 정답을 띄우면, 풀어보지 않고
+ * 답만 확인하는 길이 되어 시험이 의미를 잃는다.
+ *
+ * 동사 문제의 현재형은 문제로 주어지는 칸이라 쓴 것으로 치지 않는다.
+ */
+export function hasAttempted(questionType: QuestionType, userAnswer: string): boolean {
+  if (questionType === 'verb') {
+    const typed = splitVerbAnswer(userAnswer)
+    return typed.past.trim() !== '' || typed.participle.trim() !== ''
+  }
+  return userAnswer.trim() !== ''
+}
+
 export function isVerbWord(word: QuizWord): boolean {
   return (word.past ?? '').trim() !== '' && (word.participle ?? '').trim() !== ''
 }

@@ -7,6 +7,7 @@ import {
   formatShortDate,
   formatTime,
   generateQuestions,
+  hasAttempted,
   type Question,
   type QuizWord,
 } from './quiz'
@@ -150,5 +151,29 @@ describe('동사 3단변화 문제 출제', () => {
   it('변화형 칸이 비어 있으면 일반 문제로 낸다', () => {
     const [q] = generateQuestions([{ ...verbWord, past: '', participle: '' }], { mode: 'spelling' })
     expect(q.type).toBe('spelling')
+  })
+})
+
+describe('hasAttempted', () => {
+  it('"모르겠어요"로 넘긴 빈 답은 쓴 것으로 치지 않는다', () => {
+    expect(hasAttempted('spelling', '')).toBe(false)
+    expect(hasAttempted('verb', '')).toBe(false)
+  })
+
+  it('공백만 넣은 답도 쓴 것으로 치지 않는다', () => {
+    expect(hasAttempted('spelling', '   ')).toBe(false)
+  })
+
+  it('동사 문제는 현재형만 채워져 있으면 쓴 것으로 치지 않는다 (현재형은 문제로 주어진다)', () => {
+    expect(hasAttempted('verb', 'run |  | ')).toBe(false)
+  })
+
+  it('동사 문제는 과거형이나 과거분사형 중 하나라도 쓰면 쓴 것으로 친다', () => {
+    expect(hasAttempted('verb', 'run | ran | ')).toBe(true)
+    expect(hasAttempted('verb', 'run |  | run')).toBe(true)
+  })
+
+  it('철자 문제는 뭐라도 쓰면 쓴 것으로 친다(틀렸어도)', () => {
+    expect(hasAttempted('spelling', 'runned')).toBe(true)
   })
 })

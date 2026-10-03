@@ -11,7 +11,7 @@ const LABELS: Array<{ key: keyof VerbAnswer; label: string }> = [
  * 동사 3단변화 입력. 좁은 화면이 주 사용 환경이라 세 칸을 세로로 쌓는다.
  * 엔터로 다음 칸으로 가고, 마지막 칸에서 엔터를 누르면 제출된다(제출의 주 경로는
  * 기존 시험과 같은 "확인" 버튼이고 엔터는 보조다).
- * 채점 뒤에는 틀린 칸만 빨갛게 표시하고 그 아래에 정답을 보여준다.
+ * 채점 뒤에는 틀린 칸만 빨갛게 표시하고, revealAnswer가 true일 때만 그 아래에 정답을 보여준다.
  */
 export function VerbAnswerFields({
   value,
@@ -19,6 +19,7 @@ export function VerbAnswerFields({
   onSubmit,
   result,
   correct,
+  revealAnswer,
   disabled,
 }: {
   value: VerbAnswer
@@ -28,6 +29,8 @@ export function VerbAnswerFields({
   result: VerbResult | null
   /** 정답 세 형태. 채점 뒤 틀린 칸 아래에 보여준다. */
   correct: { term: string; past: string; participle: string }
+  /** 틀린 칸 아래에 정답을 적을지. "모르겠어요"로 넘긴 문항에서는 false라 빨간 테두리만 남는다. */
+  revealAnswer: boolean
   disabled: boolean
 }) {
   const second = useRef<HTMLInputElement>(null)
@@ -75,7 +78,7 @@ export function VerbAnswerFields({
                     : 'border-border focus:border-primary'
               }`}
             />
-            {wrong && (
+            {wrong && revealAnswer && (
               <span className="break-words text-[13px] font-semibold text-error">
                 정답: {answerOf(key)}
               </span>
