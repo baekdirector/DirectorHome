@@ -62,6 +62,7 @@ export function AdminHomework() {
   const [toDate, setToDate] = useState(today)
   const [countText, setCountText] = useState('20')
   const [allWords, setAllWords] = useState(false)
+  const [questionOrder, setQuestionOrder] = useState<'shuffle' | 'ordered'>('shuffle')
 
   const [list, setList] = useState<HomeworkRecord[] | null>(null)
   const [saving, setSaving] = useState(false)
@@ -111,7 +112,7 @@ export function AdminHomework() {
     setSaving(true)
     setError('')
     try {
-      await createHomework({ fromDate, toDate, wordSetIds: [...selected], questionCount })
+      await createHomework({ fromDate, toDate, wordSetIds: [...selected], questionCount, questionOrder })
       // 날마다 다른 단어장을 내는 것이 주된 사용법이라, 배정하고 나면 다음 날로 넘어가고
       // 선택을 풀어 둔다. 체크 → 배정만 반복하면 일주일치를 다르게 낼 수 있다.
       const after = nextDate(toDate)
@@ -220,9 +221,48 @@ export function AdminHomework() {
             </button>
           </div>
           <p className="m-0 mt-1.5 text-[12.5px] leading-relaxed text-ink-muted">
-            {selected.size > 0 && `고른 단어 ${selectedWordTotal}개 중에서 `}
-            날마다 새로 무작위로 뽑아요. 여러 날을 한꺼번에 내도 날마다 다른 단어가 나와요.
+            {questionOrder === 'shuffle' ? (
+              <>
+                {selected.size > 0 && `고른 단어 ${selectedWordTotal}개 중에서 `}
+                날마다 새로 무작위로 뽑아요. 여러 날을 한꺼번에 내도 날마다 다른 단어가 나와요.
+              </>
+            ) : (
+              <>
+                단어장에 적힌 순서대로 앞에서부터 내요.
+                {!allWords && ' 문제 수를 정하면 여러 날을 내도 날마다 같은 단어가 나와요.'}
+              </>
+            )}
           </p>
+
+          <p className="m-0 mt-4 text-[13px] font-bold text-ink-muted">문제 순서</p>
+          <div
+            role="radiogroup"
+            aria-label="문제 순서"
+            className="mt-1.5 grid grid-cols-2 gap-1 rounded-xl bg-surface-alt p-1"
+          >
+            {(
+              [
+                { value: 'shuffle', label: '섞기' },
+                { value: 'ordered', label: '단어장 순서대로' },
+              ] as const
+            ).map((option) => {
+              const active = questionOrder === option.value
+              return (
+                <button
+                  key={option.value}
+                  type="button"
+                  role="radio"
+                  aria-checked={active}
+                  onClick={() => setQuestionOrder(option.value)}
+                  className={`h-10 rounded-lg text-[14px] font-semibold ${
+                    active ? 'bg-surface text-primary shadow-sm' : 'text-ink-muted'
+                  }`}
+                >
+                  {option.label}
+                </button>
+              )
+            })}
+          </div>
           {!allWords && parsedCount === null && (
             <p className="m-0 mt-1 text-[12.5px] font-semibold text-error">
               문제 수를 1~1000 사이 숫자로 입력해 주세요.
@@ -299,6 +339,7 @@ export function AdminHomework() {
                         : hw.wordSets.map((w) => w.title).join(' + ')}
                       {' · '}
                       {hw.questionCount === 0 ? '전체' : `${hw.questionCount}문제`}
+                      {hw.questionOrder === 'ordered' && ' · 단어장 순서대로'}
                     </div>
                   </div>
                   <button

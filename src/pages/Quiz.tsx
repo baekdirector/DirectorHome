@@ -161,6 +161,7 @@ export function Quiz() {
   // 클로저로 읽으면 렌더 타이밍에 따라 기본값으로 출제될 수 있어, 필요한 값을 깃발에 싣는다.
   const [pendingHomeworkStart, setPendingHomeworkStart] = useState<{
     questionCount: number
+    questionOrder: QuizOrder
     /** 단어장 하나짜리 숙제면 그 id. 기록을 그 단어장에 연결한다. */
     wordSetId: number | null
   } | null>(null)
@@ -265,11 +266,16 @@ export function Quiz() {
           setFirstRound(saved.firstRound)
           setPhase('asking')
         } else if (hw !== null) {
-          // 숙제는 부모가 문제 수를 정했으므로 설정 화면을 건너뛴다. 순서는 늘 섞기이고
-          // (order 기본값), 문제 수 0은 ALL_WORDS와 같은 값이라 "전체"로 통한다.
+          // 숙제는 부모가 문제 수와 순서를 정했으므로 설정 화면을 건너뛴다.
+          // 문제 수 0은 ALL_WORDS와 같은 값이라 "전체"로 통한다.
           const onlySet = hw.wordSets.length === 1 ? hw.wordSets[0].id : null
           setHomeworkSetId(onlySet)
-          setPendingHomeworkStart({ questionCount: hw.questionCount, wordSetId: onlySet })
+          setPendingHomeworkStart({
+            questionCount: hw.questionCount,
+            // 이 칸이 생기기 전 숙제는 지금까지의 동작인 섞기로 둔다.
+            questionOrder: hw.questionOrder === 'ordered' ? 'ordered' : 'shuffle',
+            wordSetId: onlySet,
+          })
         } else {
           setPhase('setup')
         }
@@ -332,8 +338,9 @@ export function Quiz() {
       ? checkVerbAnswer(formsOf(currentQuestion.word), splitVerbAnswer(answers[qIndex]!.userAnswer))
       : null
 
-  function startRound(words: QuizWord[], roundNumber: number, count?: number) {
-    const qs = generateQuestions(words, { count, mode: FIXED_QUESTION_TYPE, shuffle: order === 'shuffle' })
+  function startRound(words: QuizWord[], roundNumber: number, count?: number, orderOverride?: QuizOrder) {
+    const useOrder = orderOverride ?? order
+    const qs = generateQuestions(words, { count, mode: FIXED_QUESTION_TYPE, shuffle: useOrder === 'shuffle' })
     setQuestions(qs)
     setAnswers(Array(qs.length).fill(null))
     setQIndex(0)
@@ -517,12 +524,15 @@ export function Quiz() {
   // 써서 groupId 생성·라운드 초기화가 한 곳에만 있게 한다.
   useEffect(() => {
     if (pendingHomeworkStart === null || allWords.length === 0) return
-    const { questionCount: count } = pendingHomeworkStart
+    const { questionCount: count, questionOrder } = pendingHomeworkStart
     setPendingHomeworkStart(null)
     setGroupId(crypto.randomUUID())
     setFirstRound(null)
-    // 0은 "전체"다. 순서는 늘 섞기(order 기본값)라 같은 숙제를 매일 내도 날마다 다르다.
-    startRound(allWords, 1, count === 0 ? undefined : count)
+    // 복습 라운드도 같은 순서를 쓰도록 상태에 담되, 이번 출제에는 값을 직접 넘긴다
+    // (setOrder가 반영되기 전에 startRound가 돌면 기본값으로 출제된다).
+    setOrder(questionOrder)
+    // 0은 "전체"다.
+    startRound(allWords, 1, count === 0 ? undefined : count, questionOrder)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pendingHomeworkStart, allWords])
 

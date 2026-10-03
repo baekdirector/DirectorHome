@@ -404,7 +404,7 @@ const HOMEWORK_COLUMNS = `id, due_date AS "dueDate", word_set_ids AS "wordSetIds
          question_count AS "questionCount", created_at AS "createdAt",
          completed_at AS "completedAt", completed_group_id AS "completedGroupId",
          attempted_at AS "attemptedAt", attempt_correct AS "attemptCorrect",
-         attempt_total AS "attemptTotal"`
+         attempt_total AS "attemptTotal", question_order AS "questionOrder"`
 
 router.get('/homework', async (req, res) => {
   const { from, to } = req.query
@@ -450,7 +450,7 @@ router.get('/homework/:id', async (req, res) => {
 })
 
 router.post('/homework', async (req, res) => {
-  const { fromDate, toDate, wordSetIds, questionCount } = req.body ?? {}
+  const { fromDate, toDate, wordSetIds, questionCount, questionOrder } = req.body ?? {}
   if (!DATE_RE.test(fromDate ?? '') || !DATE_RE.test(toDate ?? '')) {
     return res.status(400).json({ error: 'fromDate, toDate (YYYY-MM-DD) required' })
   }
@@ -459,15 +459,16 @@ router.post('/homework', async (req, res) => {
   }
   if (toDate < fromDate) return res.status(400).json({ error: 'toDate must not precede fromDate' })
   const count = Number.isInteger(questionCount) && questionCount >= 0 ? questionCount : 0
+  const order = questionOrder === 'ordered' ? 'ordered' : 'shuffle'
 
   // 날짜를 Postgres가 펼친다. 실수로 몇 년치를 넣는 것을 막는다.
   const { rows } = await pool.query(
-    `INSERT INTO homework (due_date, word_set_ids, question_count, created_at, owner)
-     SELECT d::date, $3::int[], $4, $5, $7
+    `INSERT INTO homework (due_date, word_set_ids, question_count, created_at, owner, question_order)
+     SELECT d::date, $3::int[], $4, $5, $7, $8
      FROM generate_series($1::date, $2::date, interval '1 day') AS d
      WHERE $2::date - $1::date < $6
      RETURNING ${HOMEWORK_COLUMNS}`,
-    [fromDate, toDate, wordSetIds, count, Date.now(), MAX_RANGE_DAYS, ownerOf(req)],
+    [fromDate, toDate, wordSetIds, count, Date.now(), MAX_RANGE_DAYS, ownerOf(req), order],
   )
   if (rows.length === 0) {
     return res.status(400).json({ error: `range must be at most ${MAX_RANGE_DAYS} days` })

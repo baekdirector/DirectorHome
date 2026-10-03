@@ -205,6 +205,11 @@ export async function migrate() {
     ALTER TABLE homework ADD COLUMN IF NOT EXISTS attempt_correct INTEGER;
     ALTER TABLE homework ADD COLUMN IF NOT EXISTS attempt_total INTEGER;
 
+    -- 출제 순서. 'shuffle'이면 날마다 무작위로 뽑고, 'ordered'면 단어장에 적힌 순서대로
+    -- 앞에서부터 낸다. 이 칸이 생기기 전 숙제는 지금까지의 동작인 'shuffle'로 남는다.
+    -- ('order'는 SQL 예약어라 칸 이름을 question_order로 둔다.)
+    ALTER TABLE homework ADD COLUMN IF NOT EXISTS question_order TEXT NOT NULL DEFAULT 'shuffle';
+
     -- ---- 아이별 단어장 분리 (JunsVoca / BeensVoca) ----
     -- 단어장·숙제·시험기록에 주인을 붙인다. 기본값이 'junsvoca'라 이 칸이 생기기 전에
     -- 쌓인 기록은 전부 첫째 것이 아니라 둘째(Juns) 것으로 남는다 -- 지금까지 이 앱은

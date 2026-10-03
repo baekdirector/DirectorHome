@@ -253,6 +253,8 @@ export interface HomeworkRecord {
   wordSets: HomeworkWordSet[]
   /** 0이면 전체 */
   questionCount: number
+  /** 'shuffle'이면 날마다 무작위, 'ordered'면 단어장 순서대로 앞에서부터 */
+  questionOrder: 'shuffle' | 'ordered'
   createdAt: number
   completedAt: number | null
   completedGroupId: string | null
@@ -285,6 +287,7 @@ export function createHomework(input: {
   toDate: string
   wordSetIds: number[]
   questionCount: number
+  questionOrder: 'shuffle' | 'ordered'
 }): Promise<HomeworkRecord[]> {
   return api('/homework', { method: 'POST', body: JSON.stringify(input) })
 }
