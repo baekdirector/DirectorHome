@@ -119,9 +119,13 @@ export function Quiz() {
   // /quiz/5 (단어장 하나), /test/start?sets=1,2,3 (여러 단어장), /wrong/quiz (id 없음: 오답 노트 단어들)
   const idsKey = wordSetIdParam ?? searchParams.get('sets') ?? ''
   const wordSetIds = idsKey ? parseIds(idsKey) : null
+  // 부모가 "숙제가 의도대로 나오는지" 확인하려고 여는 모의 테스트. 문제는 똑같이 내지만
+  // 시험 기록·숙제 완료·오답 노트에 아무것도 남기지 않고, 아이가 풀던 진행 상황도 건드리지 않는다.
+  const practice = homeworkId !== null && searchParams.get('practice') === '1'
   // 숙제는 단어장이 아니라 숙제 번호로 진행 상황을 저장한다. 같은 단어장을 자유 시험으로도
   // 풀 수 있는데, 열쇠가 같으면 서로의 진행 상황을 덮어쓴다.
-  const progressKey = homeworkId !== null ? `hw-${homeworkId}` : idsKey
+  const progressKey =
+    homeworkId !== null ? `hw-${homeworkId}${practice ? '-practice' : ''}` : idsKey
   // 단어장 하나만 고른 경우에만 값이 있다 (이름 편집, 기록의 단어장 연결에 사용)
   const urlSingleId = wordSetIds?.length === 1 ? wordSetIds[0] : null
   const navigate = useNavigate()
@@ -233,7 +237,8 @@ export function Quiz() {
         setSetCount(sets)
 
         // 풀다가 나간 테스트가 있으면 처음부터가 아니라 이어서 보여준다.
-        const saved = loadQuizProgress(progressKey)
+        // 모의 테스트는 매번 새로 뽑아야 출제 결과를 확인할 수 있으므로 이어풀기를 하지 않는다.
+        const saved = practice ? null : loadQuizProgress(progressKey)
         if (saved) {
           setQuestions(saved.questions)
           setAnswers(saved.answers)
@@ -273,7 +278,7 @@ export function Quiz() {
 
   // 풀고 있는 동안 진행 상황을 계속 저장해서, 실수로 화면을 벗어나도 이어서 풀 수 있게 한다.
   useEffect(() => {
-    if (phase !== 'asking' || questions.length === 0) return
+    if (phase !== 'asking' || questions.length === 0 || practice) return
     saveQuizProgress(progressKey, {
       wordSetTitle,
       setCount,
@@ -401,42 +406,48 @@ export function Quiz() {
     if (round === 1) setFirstRound(resultFirstRound)
 
     const durationMs = elapsedRef.current
-    try {
-      await recordQuizRound({
-        groupId,
-        wordSetId: urlSingleId ?? homeworkSetId,
-        wordSetTitle,
-        round,
-        // 서버는 소요 시간을 finishedAt - startedAt으로 계산하므로, 실제로 푼 시간이 나오게 맞춘다.
-        startedAt: finishedAt - durationMs,
-        finishedAt,
-        answers: finalAnswers,
-      })
-    } catch {
-      // 저장에 실패하면 다시 눌러 재시도할 수 있게 풀어준다. (서버는 같은 라운드 중복 저장을 무시한다)
-      submittingRef.current = false
-      setSubmitting(false)
-      setSubmitError('결과를 저장하지 못했어요. 인터넷 연결을 확인하고 다시 눌러주세요.')
-      return
-    }
-    clearQuizProgress(progressKey) // 서버에 남겼으니 기기의 임시 저장은 지운다
-
-    // 틀린 단어가 0인 라운드를 마쳤을 때만 숙제가 끝난 것이다(설계 3.4).
     let homeworkDone = false
     let homeworkError: string | null = null
-    if (homeworkId !== null && wrongAnswers.length === 0) {
+
+    // 모의 테스트는 출제 결과만 확인하는 것이라 시험 기록·오답 노트·숙제 완료 어디에도 남기지 않는다.
+    if (!practice) {
       try {
-        await completeHomework(homeworkId, groupId)
-        homeworkDone = true
+        await recordQuizRound({
+          groupId,
+          wordSetId: urlSingleId ?? homeworkSetId,
+          wordSetTitle,
+          round,
+          // 서버는 소요 시간을 finishedAt - startedAt으로 계산하므로, 실제로 푼 시간이 나오게 맞춘다.
+          startedAt: finishedAt - durationMs,
+          finishedAt,
+          answers: finalAnswers,
+        })
       } catch {
-        // 시험 기록은 이미 저장됐다. 숙제 도장만 못 찍었으니 결과 화면은 그대로 보여주고
-        // 조용히 알린다. 다시 풀면 복구된다. submitError는 문제 화면 전용이라 여기서는
-        // 결과에 실어 보내야 보인다.
-        homeworkError = '오늘의 단어 완료를 기록하지 못했어요. 인터넷이 연결되면 다시 풀어주세요.'
+        // 저장에 실패하면 다시 눌러 재시도할 수 있게 풀어준다. (서버는 같은 라운드 중복 저장을 무시한다)
+        submittingRef.current = false
+        setSubmitting(false)
+        setSubmitError('결과를 저장하지 못했어요. 인터넷 연결을 확인하고 다시 눌러주세요.')
+        return
       }
-    } else if (homeworkId !== null) {
-      // 못 끝낸 시도도 남겨서 홈에서 "아직 완료 못했어요"를 보여준다. 실패해도 시험 흐름은 막지 않는다.
-      await recordHomeworkAttempt(homeworkId, correctCount, finalAnswers.length).catch(() => {})
+      clearQuizProgress(progressKey) // 서버에 남겼으니 기기의 임시 저장은 지운다
+
+      if (homeworkId !== null) {
+        // 틀린 단어가 0인 라운드를 마쳤을 때만 숙제가 끝난 것이다(설계 3.4).
+        if (wrongAnswers.length === 0) {
+          try {
+            await completeHomework(homeworkId, groupId)
+            homeworkDone = true
+          } catch {
+            // 시험 기록은 이미 저장됐다. 숙제 도장만 못 찍었으니 결과 화면은 그대로 보여주고
+            // 조용히 알린다. 다시 풀면 복구된다. submitError는 문제 화면 전용이라 여기서는
+            // 결과에 실어 보내야 보인다.
+            homeworkError = '오늘의 단어 완료를 기록하지 못했어요. 인터넷이 연결되면 다시 풀어주세요.'
+          }
+        } else {
+          // 못 끝낸 시도도 남겨서 홈에서 "아직 완료 못했어요"를 보여준다. 실패해도 시험 흐름은 막지 않는다.
+          await recordHomeworkAttempt(homeworkId, correctCount, finalAnswers.length).catch(() => {})
+        }
+      }
     }
 
     setRoundResult({
@@ -507,17 +518,20 @@ export function Quiz() {
     startRound(wrongWords, round + 1)
   }
 
+  // 모의 테스트는 숙제 관리 화면에서 열리므로 끝내면 그리로 돌아간다.
+  const exitTo = practice ? '/admin' : '/'
+
   function requestExit() {
     if (phase === 'asking') {
       setExitDialogOpen(true)
       return
     }
-    navigate('/')
+    navigate(exitTo)
   }
 
   function confirmExit() {
     clearQuizProgress(progressKey)
-    navigate('/')
+    navigate(exitTo)
   }
 
   if (phase === 'loading') {
@@ -624,8 +638,9 @@ export function Quiz() {
       <RoundSummary
         wordSetTitle={wordSetTitle}
         result={roundResult}
+        practice={practice}
         onRetry={retryWrong}
-        onHome={() => navigate('/')}
+        onHome={() => navigate(exitTo)}
         onWrongNotes={() => navigate('/wrong')}
       />
     )
@@ -679,6 +694,11 @@ export function Quiz() {
             {qIndex + 1} / {questions.length}
           </span>
         </div>
+        {practice && (
+          <div className="mt-2.5 flex justify-center">
+            <PracticeBadge />
+          </div>
+        )}
         {isReviewRound && (
           <div className="mt-2.5 flex justify-center">
             <span className="rounded-full bg-accent-tint px-3 py-1 text-[11.5px] font-bold text-accent-dark">
@@ -980,15 +1000,29 @@ function FeedbackBanner({
   )
 }
 
+/** 모의 테스트 중임을 알리는 표시. 기록이 남는 진짜 시험과 헷갈리지 않게 한다. */
+function PracticeBadge({ className = '' }: { className?: string }) {
+  return (
+    <span
+      className={`inline-block rounded-full bg-warning-tint px-3 py-1 text-[11.5px] font-bold text-warning ${className}`}
+    >
+      모의 테스트 · 어디에도 기록되지 않아요
+    </span>
+  )
+}
+
 function RoundSummary({
   wordSetTitle,
   result,
+  practice,
   onRetry,
   onHome,
   onWrongNotes,
 }: {
   wordSetTitle: string
   result: RoundResult
+  /** 모의 테스트면 아무것도 기록되지 않았으므로 기록 관련 안내를 빼고 그 사실을 알린다. */
+  practice: boolean
   onRetry: () => void
   onHome: () => void
   onWrongNotes: () => void
@@ -999,6 +1033,8 @@ function RoundSummary({
   const first = result.firstRound
   const firstAccuracy = first.total > 0 ? Math.round((first.correct / first.total) * 100) : 0
   const hadMistakes = first.correct < first.total
+  // 모의 테스트는 오답 노트에 아무것도 담기지 않았으므로 안내를 띄우지 않는다.
+  const showWrongNotes = hadMistakes && !practice
 
   return (
     <div className="flex min-h-svh flex-col bg-bg">
@@ -1009,6 +1045,7 @@ function RoundSummary({
         <p className="m-0 mt-1 text-[12.5px] text-ink-muted">
           {wordSetTitle} · {formatDateTime(result.finishedAt)}
         </p>
+        {practice && <PracticeBadge className="mt-2.5" />}
 
         {result.isFinal ? (
           <div className="mx-auto mt-3.5 flex h-[132px] w-[132px] flex-col items-center justify-center rounded-full border-8 border-surface bg-success-tint">
@@ -1124,7 +1161,7 @@ function RoundSummary({
             </p>
           </>
         )}
-        {hadMistakes && (
+        {showWrongNotes && (
           <button
             type="button"
             onClick={onWrongNotes}
@@ -1138,7 +1175,7 @@ function RoundSummary({
           onClick={onHome}
           className="rounded-[14px] border border-border p-3 text-center text-[14px] font-semibold text-ink"
         >
-          홈으로 가기
+          {practice ? '숙제 관리로 돌아가기' : '홈으로 가기'}
         </button>
       </div>
     </div>

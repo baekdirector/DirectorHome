@@ -30,7 +30,7 @@ const FUTURE_DAYS = 28
 
 export function Admin() {
   return (
-    <AccessGate>
+    <AccessGate title="부모님 화면입니다" description="비밀번호를 입력하세요." confirmLabel="확인">
       <AdminBody />
     </AccessGate>
   )
@@ -247,7 +247,10 @@ function AdminBody() {
 
         <section>
           <h3 className="m-0 text-[15px] font-extrabold">배정된 숙제</h3>
-          <p className="m-0 mt-1 text-[12.5px] text-ink-muted">지난 2주와 앞으로 4주를 보여줘요</p>
+          <p className="m-0 mt-1 text-[12.5px] text-ink-muted">
+            지난 2주와 앞으로 4주를 보여줘요 · <span className="font-semibold">테스트</span>는 문제가 어떻게
+            나오는지 미리 풀어보는 용도예요(기록에 남지 않아요)
+          </p>
           <div className="mt-2.5 flex flex-col gap-2">
             {list === null ? (
               <Loading />
@@ -291,6 +294,14 @@ function AdminBody() {
                       {hw.questionCount === 0 ? '전체' : `${hw.questionCount}문제`}
                     </div>
                   </div>
+                  <button
+                    type="button"
+                    aria-label={`${formatDueDate(hw.dueDate)} 숙제 모의 테스트`}
+                    onClick={() => navigate(`/quiz/homework/${hw.id}?practice=1`)}
+                    className="h-9 flex-none rounded-[10px] border border-border bg-surface px-2.5 text-[12.5px] font-bold text-primary"
+                  >
+                    테스트
+                  </button>
                   <button
                     type="button"
                     aria-label={`${formatDueDate(hw.dueDate)} 숙제 삭제`}
