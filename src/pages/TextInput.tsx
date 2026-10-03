@@ -3,19 +3,12 @@ import { useNavigate } from 'react-router-dom'
 import { ArrowLeftIcon, CheckCircleIcon } from '../components/icons'
 import { parseWordsDetailed } from '../lib/parseWords'
 import { parseVerbsDetailed } from '../lib/verbs'
+import { useProfile } from '../components/ProfileGate'
+import { defaultKindFor, kindOption, kindOptionsFor } from '../lib/wordSetKinds'
 
 const DRAFT_KEY = 'junsvoca_draft_words'
 
 type Kind = 'vocab' | 'verb'
-
-const PLACEHOLDER = `1 festival 축제
-2 national holiday 국경일
-3 celebrate 기념하다
-4 flea market 벼룩시장`
-
-const VERB_PLACEHOLDER = `1 come came come 오다
-2 go went gone 가다
-3 be was/were been 이다, 있다`
 
 function defaultTitle() {
   const d = new Date()
@@ -43,7 +36,11 @@ export function TextInput() {
   const navigate = useNavigate()
   const [text, setText] = useState(loadDraft)
   const [title, setTitle] = useState(defaultTitle)
-  const [kind, setKind] = useState<Kind>('vocab')
+  const { owner } = useProfile()
+  // 고를 수 있는 종류는 아이마다 다르다(lib/wordSetKinds).
+  const kindOptions = kindOptionsFor(owner)
+  const [kind, setKind] = useState<Kind>(() => defaultKindFor(owner))
+  const selectedKind = kindOption(owner, kind)
 
   const vocab = useMemo(() => parseWordsDetailed(text), [text])
   const verb = useMemo(() => parseVerbsDetailed(text), [text])
@@ -93,43 +90,38 @@ export function TextInput() {
           />
         </label>
 
-        <div className="grid grid-cols-2 gap-1 rounded-2xl bg-surface-alt p-1">
-          {(['vocab', 'verb'] as const).map((k) => (
-            <button
-              key={k}
-              type="button"
-              onClick={() => setKind(k)}
-              aria-pressed={kind === k}
-              className={`h-10 rounded-xl text-[14px] font-semibold ${
-                kind === k ? 'bg-surface text-primary shadow-sm' : 'text-ink-muted'
-              }`}
-            >
-              {k === 'vocab' ? '일반 단어' : '동사 3단변화'}
-            </button>
-          ))}
-        </div>
+        {/* 고를 종류가 하나뿐이면 토글을 보여줄 이유가 없다. */}
+        {kindOptions.length > 1 && (
+          <div
+            className="grid gap-1 rounded-2xl bg-surface-alt p-1"
+            style={{ gridTemplateColumns: `repeat(${kindOptions.length}, minmax(0, 1fr))` }}
+          >
+            {kindOptions.map((option) => (
+              <button
+                key={option.kind}
+                type="button"
+                onClick={() => setKind(option.kind)}
+                aria-pressed={kind === option.kind}
+                className={`h-10 rounded-xl text-[14px] font-semibold ${
+                  kind === option.kind ? 'bg-surface text-primary shadow-sm' : 'text-ink-muted'
+                }`}
+              >
+                {option.label}
+              </button>
+            ))}
+          </div>
+        )}
 
         <div>
           <p className="m-0 text-[13px] leading-relaxed text-ink-muted">
-            {isVerb ? (
-              <>
-                한 줄에 하나씩 <b className="text-ink">번호 · 현재형 · 과거형 · 과거분사형 · 뜻</b>{' '}
-                순서로 입력하세요.
-                <br />
-                번호는 없어도 되고, 뜻에 띄어쓰기나 쉼표가 있어도 괜찮아요. 예) come came come 오다
-              </>
-            ) : (
-              <>
-                한 줄에 단어 하나씩 <b className="text-ink">번호 · 영단어 · 뜻</b> 순서로 입력하세요.
-                <br />
-                번호는 없어도 되고, 메모장이나 엑셀에서 붙여넣어도 돼요.
-              </>
-            )}
+            {selectedKind.hint}
+            <br />
+            번호는 없어도 되고, 메모장이나 엑셀에서 붙여넣어도 돼요.
           </p>
           <textarea
             value={text}
             onChange={(e) => handleChange(e.target.value)}
-            placeholder={isVerb ? VERB_PLACEHOLDER : PLACEHOLDER}
+            placeholder={selectedKind.placeholder}
             rows={9}
             spellCheck={false}
             autoCapitalize="none"

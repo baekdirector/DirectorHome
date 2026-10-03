@@ -12,6 +12,7 @@ import { ParentSessionDetail } from './pages/ParentSessionDetail'
 import { Admin, AdminHomework } from './pages/Admin'
 import { AdminPasswords } from './pages/AdminPasswords'
 import { AdminWordSets } from './pages/AdminWordSets'
+import { AdminWordSetNew } from './pages/AdminWordSetNew'
 import { HouseholdBackGuard } from './components/HouseholdBackGuard'
 import { ProfileGate } from './components/ProfileGate'
 import { Loading } from './components/Loading'
@@ -51,6 +52,7 @@ function App() {
           <Route path="/admin" element={<Admin />}>
             <Route index element={<AdminHomework />} />
             <Route path="wordsets" element={<AdminWordSets />} />
+            <Route path="wordsets/new" element={<AdminWordSetNew />} />
             <Route path="passwords" element={<AdminPasswords />} />
           </Route>
           <Route

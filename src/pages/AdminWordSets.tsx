@@ -191,7 +191,7 @@ export function AdminWordSets() {
         </p>
 
         <Link
-          to="/input"
+          to="/admin/wordsets/new"
           className="mt-3 flex items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-border p-3.5 text-[14px] font-bold text-primary no-underline"
         >
           <PlusIcon width={16} height={16} />새 단어장 만들기 ({PROFILE_LABEL[owner]})
