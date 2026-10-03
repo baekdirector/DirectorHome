@@ -193,7 +193,7 @@ export function OwnerSwitch({ className = '' }: { className?: string }) {
   if (!isAdmin) return null
 
   return (
-    <div role="radiogroup" aria-label="보고 있는 아이" className={`flex gap-1.5 ${className}`}>
+    <div role="radiogroup" aria-label="보고 있는 아이" className={`flex flex-none gap-1.5 ${className}`}>
       {CHILD_PROFILES.map((child) => {
         const selected = child === owner
         return (

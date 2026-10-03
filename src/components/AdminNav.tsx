@@ -20,7 +20,7 @@ export function AdminNav() {
   const isActive = (to: string) => (to === '/admin' ? pathname === '/admin' : pathname.startsWith(to))
 
   const heading = (
-    <div className="flex items-center gap-3">
+    <div className="flex min-w-0 items-center gap-3">
       <button
         type="button"
         aria-label="홈으로"
@@ -29,7 +29,7 @@ export function AdminNav() {
       >
         <ArrowLeftIcon />
       </button>
-      <h2 className="m-0 text-[17px] font-bold">부모 화면</h2>
+      <h2 className="m-0 truncate text-[17px] font-bold">부모 화면</h2>
     </div>
   )
 

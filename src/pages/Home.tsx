@@ -72,13 +72,12 @@ export function Home() {
             type="button"
             onClick={() => setDrawerOpen(true)}
             aria-label="서비스 전환 메뉴 열기"
-            className="flex items-center gap-2"
+            className="flex min-w-0 items-center gap-2"
           >
-            <img src="/icons/icon-192.png" alt="" width={36} height={36} className="h-9 w-9 rounded-[10px]" />
-            <span className="font-display text-[19px] font-bold">{PROFILE_LABEL[owner]}</span>
+            <img src="/icons/icon-192.png" alt="" width={36} height={36} className="h-9 w-9 flex-none rounded-[10px]" />
+            <span className="truncate font-display text-[19px] font-bold">{PROFILE_LABEL[owner]}</span>
           </button>
-          <div className="flex items-center gap-2">
-            <OwnerSwitch className="mr-1" />
+          <div className="flex flex-none items-center gap-2">
             {isAdmin && (
               <>
             <Link
@@ -99,6 +98,10 @@ export function Home() {
             )}
           </div>
         </div>
+
+        {/* 좁은 화면에서 브랜드·아이 전환·아이콘 버튼을 한 줄에 다 넣으면 제목이 잘린다.
+            부모 모드에서만 나오는 전환 버튼은 아래 줄로 내린다. */}
+        <OwnerSwitch className="pt-3.5" />
 
         <div className="pt-6">
           <p className="m-0 text-[13px] text-ink-muted">{todayLabel(today)}</p>

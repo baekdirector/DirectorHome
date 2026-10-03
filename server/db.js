@@ -225,6 +225,25 @@ export async function migrate() {
       password_hash TEXT NOT NULL,
       updated_at BIGINT NOT NULL
     );
+
+    -- ---- 단어장 카테고리 ----
+    -- 단어장이 쌓이면 한 줄짜리 목록으로는 찾기 어렵다. "Listening", "동사변화"처럼
+    -- 묶어 보여주기 위한 분류다. 아이마다 따로 둔다(같은 이름이라도 서로의 것이 아니다).
+    CREATE TABLE IF NOT EXISTS word_set_categories (
+      id SERIAL PRIMARY KEY,
+      owner TEXT NOT NULL,
+      name TEXT NOT NULL,
+      display_order INTEGER NOT NULL DEFAULT 0,
+      created_at BIGINT NOT NULL,
+      UNIQUE (owner, name)
+    );
+
+    -- 분류를 지워도 단어장은 남고 "미분류"로 돌아간다. 단어가 사라지면 안 된다.
+    ALTER TABLE word_sets ADD COLUMN IF NOT EXISTS category_id INTEGER
+      REFERENCES word_set_categories(id) ON DELETE SET NULL;
+
+    CREATE INDEX IF NOT EXISTS idx_word_sets_category ON word_sets(category_id);
+    CREATE INDEX IF NOT EXISTS idx_word_set_categories_owner ON word_set_categories(owner, display_order);
   `)
 
   // 오답 노트 기능 이전의 틀린 기록으로 노트를 채운다. 이미 노트에 있는 단어는 건드리지 않는다.

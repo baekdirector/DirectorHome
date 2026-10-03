@@ -172,7 +172,8 @@ async function updateWrongNote(client, answer, { groupId, round, finishedAt }) {
 
 router.get('/wordsets', async (req, res) => {
   const { rows } = await pool.query(
-    `SELECT ws.id, ws.title, ws.kind, ws.created_at AS "createdAt", COUNT(w.id)::int AS count
+    `SELECT ws.id, ws.title, ws.kind, ws.created_at AS "createdAt",
+            ws.category_id AS "categoryId", COUNT(w.id)::int AS count
      FROM word_sets ws
      LEFT JOIN words w ON w.word_set_id = ws.id
      WHERE ws.owner = $1
@@ -224,9 +225,10 @@ router.get('/wordsets/:id/words', async (req, res) => {
 })
 
 router.post('/wordsets', async (req, res) => {
-  const { title, words, kind } = req.body
+  const { title, words, kind, categoryId } = req.body
   if (!title || !Array.isArray(words)) return res.status(400).json({ error: 'title and words[] required' })
   const setKind = kind === 'verb' ? 'verb' : 'vocab'
+  const setCategory = Number.isInteger(categoryId) ? categoryId : null
 
   const client = await pool.connect()
   try {
@@ -234,8 +236,9 @@ router.post('/wordsets', async (req, res) => {
     const {
       rows: [wordSet],
     } = await client.query(
-      `INSERT INTO word_sets (title, kind, created_at, owner) VALUES ($1, $2, $3, $4) RETURNING id`,
-      [title, setKind, Date.now(), ownerOf(req)],
+      `INSERT INTO word_sets (title, kind, created_at, owner, category_id)
+       VALUES ($1, $2, $3, $4, $5) RETURNING id`,
+      [title, setKind, Date.now(), ownerOf(req), setCategory],
     )
     for (const w of words) {
       await client.query(
@@ -255,8 +258,73 @@ router.post('/wordsets', async (req, res) => {
 })
 
 router.patch('/wordsets/:id', async (req, res) => {
-  const { title } = req.body
-  await pool.query(`UPDATE word_sets SET title = $1 WHERE id = $2`, [title, req.params.id])
+  const { title, categoryId } = req.body ?? {}
+  if (typeof title === 'string') {
+    await pool.query(`UPDATE word_sets SET title = $1 WHERE id = $2`, [title, req.params.id])
+  }
+  // categoryId를 null로 보내면 "미분류"로 되돌린다. 아예 안 보내면 분류는 건드리지 않는다.
+  if (categoryId === null || Number.isInteger(categoryId)) {
+    await pool.query(`UPDATE word_sets SET category_id = $1 WHERE id = $2 AND owner = $3`, [
+      categoryId,
+      req.params.id,
+      ownerOf(req),
+    ])
+  }
+  res.json({ ok: true })
+})
+
+// ---- 단어장 카테고리 ----
+
+router.get('/wordset-categories', async (req, res) => {
+  const { rows } = await pool.query(
+    `SELECT c.id, c.name, c.display_order AS "displayOrder", c.created_at AS "createdAt",
+            COUNT(ws.id)::int AS "setCount"
+     FROM word_set_categories c
+     LEFT JOIN word_sets ws ON ws.category_id = c.id
+     WHERE c.owner = $1
+     GROUP BY c.id
+     ORDER BY c.display_order, c.id`,
+    [ownerOf(req)],
+  )
+  res.json(rows)
+})
+
+router.post('/wordset-categories', async (req, res) => {
+  const name = typeof req.body?.name === 'string' ? req.body.name.trim() : ''
+  if (name === '') return res.status(400).json({ error: 'name required' })
+  const owner = ownerOf(req)
+  // 같은 이름이 이미 있으면 새로 만들지 않고 그것을 돌려준다. 화면에서 "직접 입력"으로
+  // 같은 이름을 또 넣어도 분류가 두 개로 갈라지지 않는다.
+  const {
+    rows: [row],
+  } = await pool.query(
+    `INSERT INTO word_set_categories (owner, name, display_order, created_at)
+     VALUES ($1, $2, COALESCE((SELECT MAX(display_order) + 1 FROM word_set_categories WHERE owner = $1), 0), $3)
+     ON CONFLICT (owner, name) DO UPDATE SET name = EXCLUDED.name
+     RETURNING id, name, display_order AS "displayOrder", created_at AS "createdAt"`,
+    [owner, name, Date.now()],
+  )
+  res.json({ ...row, setCount: 0 })
+})
+
+router.patch('/wordset-categories/:id', async (req, res) => {
+  const name = typeof req.body?.name === 'string' ? req.body.name.trim() : ''
+  if (name === '') return res.status(400).json({ error: 'name required' })
+  const { rowCount } = await pool.query(
+    `UPDATE word_set_categories SET name = $1 WHERE id = $2 AND owner = $3`,
+    [name, req.params.id, ownerOf(req)],
+  )
+  if (rowCount === 0) return res.status(404).json({ error: 'not found' })
+  res.json({ ok: true })
+})
+
+// 분류만 사라지고 단어장은 "미분류"로 남는다(스키마의 ON DELETE SET NULL).
+router.delete('/wordset-categories/:id', async (req, res) => {
+  const { rowCount } = await pool.query(`DELETE FROM word_set_categories WHERE id = $1 AND owner = $2`, [
+    req.params.id,
+    ownerOf(req),
+  ])
+  if (rowCount === 0) return res.status(404).json({ error: 'not found' })
   res.json({ ok: true })
 })
 

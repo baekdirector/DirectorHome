@@ -10,6 +10,18 @@ export interface WordSetRecord {
   createdAt: number
   /** 'verb'면 동사 3단변화 단어장이다. */
   kind: 'vocab' | 'verb'
+  /** 단어장 분류. null이면 미분류다. */
+  categoryId: number | null
+}
+
+/** 단어장을 묶어 보여주기 위한 분류. 아이마다 따로 둔다. */
+export interface WordSetCategory {
+  id: number
+  name: string
+  displayOrder: number
+  createdAt: number
+  /** 이 분류에 담긴 단어장 수. 지울 때 영향 범위를 보여주는 데 쓴다. */
+  setCount: number
 }
 
 export interface WordRecord {
@@ -73,10 +85,11 @@ export async function createWordSet(
   title: string,
   words: Array<Pick<WordRecord, 'term' | 'meaning' | 'isIdiom' | 'partOfSpeech' | 'past' | 'participle'>>,
   kind: 'vocab' | 'verb' = 'vocab',
+  categoryId: number | null = null,
 ): Promise<number> {
   const { id } = await api<{ id: number }>('/wordsets', {
     method: 'POST',
-    body: JSON.stringify({ title, words, kind }),
+    body: JSON.stringify({ title, words, kind, categoryId }),
   })
   return id
 }
@@ -91,6 +104,29 @@ export function getWordSet(wordSetId: number): Promise<WordSetRecord | undefined
 
 export function updateWordSetTitle(wordSetId: number, title: string): Promise<void> {
   return api(`/wordsets/${wordSetId}`, { method: 'PATCH', body: JSON.stringify({ title }) })
+}
+
+/** 단어장의 분류를 바꾼다. null이면 미분류로 되돌린다. */
+export function updateWordSetCategory(wordSetId: number, categoryId: number | null): Promise<void> {
+  return api(`/wordsets/${wordSetId}`, { method: 'PATCH', body: JSON.stringify({ categoryId }) })
+}
+
+export function getWordSetCategories(): Promise<WordSetCategory[]> {
+  return api('/wordset-categories')
+}
+
+/** 같은 이름이 이미 있으면 새로 만들지 않고 그 분류를 돌려준다. */
+export function createWordSetCategory(name: string): Promise<WordSetCategory> {
+  return api('/wordset-categories', { method: 'POST', body: JSON.stringify({ name }) })
+}
+
+export function renameWordSetCategory(id: number, name: string): Promise<{ ok: true }> {
+  return api(`/wordset-categories/${id}`, { method: 'PATCH', body: JSON.stringify({ name }) })
+}
+
+/** 분류만 사라지고 담겨 있던 단어장은 미분류로 남는다. */
+export function deleteWordSetCategory(id: number): Promise<{ ok: true }> {
+  return api(`/wordset-categories/${id}`, { method: 'DELETE' })
 }
 
 /** 단어장별로 완료한 테스트(1라운드) 횟수. 여러 단어장을 묶어 본 테스트는 포함되지 않는다. */

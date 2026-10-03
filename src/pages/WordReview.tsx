@@ -3,10 +3,14 @@ import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import { ArrowLeftIcon, PlusIcon, TrashIcon } from '../components/icons'
 import { BlockingOverlay } from '../components/BlockingOverlay'
 import { Loading, Spinner } from '../components/Loading'
+import { CategoryPicker } from '../components/CategoryPicker'
 import { SpeakButton } from '../components/SpeakButton'
 import {
   addWord as dbAddWord,
   createWordSet,
+  getWordSetCategories,
+  updateWordSetCategory,
+  type WordSetCategory,
   deleteWord as dbDeleteWord,
   getWordSet,
   getWordsBySet,
@@ -59,6 +63,8 @@ export function WordReview() {
   const [title, setTitle] = useState(() => location.state?.title || defaultTitle())
   // 새 단어장은 입력 화면이 정한 형식을 그대로 쓰고, 기존 단어장은 불러올 때 알게 된다.
   const [kind, setKind] = useState<Kind>(location.state?.kind === 'verb' ? 'verb' : 'vocab')
+  const [categories, setCategories] = useState<WordSetCategory[]>([])
+  const [categoryId, setCategoryId] = useState<number | null>(null)
   const [rows, setRows] = useState<Row[]>(() => {
     if (isExisting) return []
     if (location.state?.kind === 'verb') {
@@ -97,6 +103,7 @@ export function WordReview() {
       if (cancelled) return
       setTitle(set?.title ?? defaultTitle())
       setKind(set?.kind === 'verb' ? 'verb' : 'vocab')
+      setCategoryId(set?.categoryId ?? null)
       setRows(
         words.map((w) => ({
           key: `db-${w.id}`,
@@ -113,6 +120,13 @@ export function WordReview() {
       cancelled = true
     }
   }, [isExisting, wordSetId])
+
+  useEffect(() => {
+    getWordSetCategories()
+      .then(setCategories)
+      // 분류는 단어 입력의 곁다리다. 못 불러와도 "미분류"로 저장할 수 있어야 한다.
+      .catch(() => setCategories([]))
+  }, [])
 
   const validCount = useMemo(() => rows.filter((r) => isComplete(r, kind)).length, [rows, kind])
 
@@ -192,7 +206,7 @@ export function WordReview() {
           past: kind === 'verb' ? r.past.trim() : undefined,
           participle: kind === 'verb' ? r.participle.trim() : undefined,
         }))
-      const newId = await createWordSet(title.trim() || defaultTitle(), cleaned, kind)
+      const newId = await createWordSet(title.trim() || defaultTitle(), cleaned, kind, categoryId)
       clearWordSetsCache() // 목록을 다시 불러와서 방금 저장한 단어장이 보이게 한다
       navigate('/wordsets', { state: { savedId: newId } })
     } catch {
@@ -226,6 +240,20 @@ export function WordReview() {
           className="m-0 min-w-0 flex-1 bg-transparent text-[17px] font-bold outline-none"
         />
         {pending > 0 && <Spinner size={18} label="저장 중" />}
+      </div>
+
+      <div className="flex-none px-[22px] pt-3.5">
+        <div className="mb-1.5 text-[13px] font-bold text-ink-muted">분류</div>
+        <CategoryPicker
+          categories={categories}
+          value={categoryId}
+          onChange={(next) => {
+            setCategoryId(next)
+            // 이미 저장된 단어장이면 고르는 즉시 반영한다(새 단어장은 저장할 때 함께 간다).
+            if (isExisting) track(updateWordSetCategory(wordSetId!, next))
+          }}
+          onCategoryCreated={(created) => setCategories((prev) => [...prev, created])}
+        />
       </div>
 
       <div className="flex flex-none items-center justify-between px-[22px] pb-1.5 pt-3.5">

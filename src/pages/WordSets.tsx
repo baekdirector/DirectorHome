@@ -4,7 +4,15 @@ import { BookIcon, PencilIcon, PlusIcon, TrashIcon } from '../components/icons'
 import { BottomNav } from '../components/BottomNav'
 import { ConfirmDialog } from '../components/ConfirmDialog'
 import { Loading, Spinner } from '../components/Loading'
-import { deleteWordSet, getWordSetAttemptCounts, getWordSets, updateWordSetTitle } from '../lib/db'
+import {
+  deleteWordSet,
+  getWordSetAttemptCounts,
+  getWordSetCategories,
+  getWordSets,
+  updateWordSetTitle,
+  type WordSetCategory,
+} from '../lib/db'
+import { groupByCategory } from '../lib/wordSetGroups'
 import { loadWordSetsCache, saveWordSetsCache, type WordSetItem } from '../lib/wordSetsCache'
 import { useSlowLoading } from '../lib/useSlowLoading'
 import { useProtectedAction } from '../lib/useProtectedAction'
@@ -19,6 +27,7 @@ export function WordSets() {
   const [draftTitle, setDraftTitle] = useState('')
   const [error, setError] = useState('')
   const [attemptCounts, setAttemptCounts] = useState<Map<number, number>>(new Map())
+  const [categories, setCategories] = useState<WordSetCategory[]>([])
   const [pendingDelete, setPendingDelete] = useState<WordSetItem | null>(null)
   const [deleting, setDeleting] = useState(false)
   const slow = useSlowLoading(refreshing && sets !== null)
@@ -36,6 +45,10 @@ export function WordSets() {
     getWordSetAttemptCounts()
       .then((rows) => setAttemptCounts(new Map(rows.map((r) => [r.wordSetId, r.count]))))
       .catch(() => {})
+    // 분류를 못 불러오면 묶지 않고 한 줄로 보여준다(목록 자체는 보이는 게 낫다).
+    getWordSetCategories()
+      .then(setCategories)
+      .catch(() => setCategories([]))
   }, [])
 
   async function confirmDelete() {
@@ -112,7 +125,13 @@ export function WordSets() {
               아직 단어장이 없어요. 단어를 입력해서 첫 단어장을 만들어보세요.
             </p>
           ) : (
-            sets.map((s) => (
+            groupByCategory(sets, categories).map((group) => (
+              <div key={group.key} className="flex flex-col gap-2.5">
+                <div className="flex items-baseline gap-2 pt-1.5">
+                  <h2 className="m-0 text-[13.5px] font-extrabold text-ink">{group.name}</h2>
+                  <span className="text-[12px] text-ink-muted">{group.sets.length}개</span>
+                </div>
+                {group.sets.map((s) => (
               <div
                 key={s.id}
                 className={`flex items-center gap-2 rounded-2xl border p-4 ${
@@ -194,6 +213,8 @@ export function WordSets() {
                     </button>
                   </>
                 )}
+              </div>
+                ))}
               </div>
             ))
           )}
