@@ -1,7 +1,89 @@
+import { randomBytes, scryptSync, timingSafeEqual } from 'node:crypto'
 import { Router } from 'express'
 import { pool } from './db.js'
 
 export const router = Router()
+
+// ---- 사용자 구분 (JunsVoca / BeensVoca / admin) ----
+
+/** 단어장을 따로 쓰는 아이 계정. admin은 이 둘 중 하나를 골라서 본다. */
+export const CHILD_IDS = ['junsvoca', 'beensvoca']
+
+/**
+ * 이 요청이 누구의 단어장을 보려는 것인지. 화면이 X-Voca-Owner 헤더로 알려준다.
+ * 모르는 값이면 기존 데이터의 주인인 junsvoca로 떨어뜨린다 -- 헤더를 안 보내던
+ * 예전 화면이 남아 있어도 지금까지와 같게 동작한다.
+ */
+export function ownerOf(req) {
+  const raw = req.get('X-Voca-Owner')
+  return CHILD_IDS.includes(raw) ? raw : 'junsvoca'
+}
+
+/** 가계부·OPIC·admin이 함께 쓰는 서비스 비밀번호. 배포 설정(환경변수)에서 관리한다. */
+function servicePassword() {
+  // 이름을 DIRECTORHOME_PASSWORD로 바꾸는 중이다. 배포 설정이 아직 옛 이름이어도 열리게 둘 다 읽는다.
+  return process.env.DIRECTORHOME_PASSWORD || process.env.HOUSEHOLD_PASSWORD || ''
+}
+
+export function hashPassword(password) {
+  const salt = randomBytes(16).toString('hex')
+  return `${salt}:${scryptSync(password, salt, 64).toString('hex')}`
+}
+
+export function verifyHashed(password, stored) {
+  const [salt, expected] = String(stored).split(':')
+  if (!salt || !expected) return false
+  const actual = scryptSync(password, salt, 64)
+  const expectedBuf = Buffer.from(expected, 'hex')
+  // 길이가 다르면 timingSafeEqual이 던진다.
+  return actual.length === expectedBuf.length && timingSafeEqual(actual, expectedBuf)
+}
+
+/**
+ * 입구 로그인. id는 junsvoca / beensvoca / admin.
+ * 아이 비밀번호는 DB(app_users), admin 비밀번호는 서비스 환경변수다.
+ * 비밀번호가 아직 없는 아이 계정은 unset으로 알려 "부모님께 요청하세요"를 띄우게 한다.
+ */
+router.post('/login', async (req, res) => {
+  const { id, password } = req.body ?? {}
+  if (typeof id !== 'string' || typeof password !== 'string') {
+    return res.status(400).json({ error: 'id and password required' })
+  }
+
+  if (id === 'admin') {
+    const expected = servicePassword()
+    if (!expected) return res.status(500).json({ error: 'DIRECTORHOME_PASSWORD is not configured' })
+    return res.json({ ok: password === expected, profile: 'admin' })
+  }
+
+  if (!CHILD_IDS.includes(id)) return res.json({ ok: false })
+
+  const { rows } = await pool.query(`SELECT password_hash AS "hash" FROM app_users WHERE id = $1`, [id])
+  if (!rows[0]) return res.json({ ok: false, reason: 'unset' })
+  res.json({ ok: verifyHashed(password, rows[0].hash), profile: id })
+})
+
+/** 아이 계정 목록과 비밀번호 설정 여부. 비밀번호 자체는 절대 돌려주지 않는다. */
+router.get('/app-users', async (_req, res) => {
+  const { rows } = await pool.query(`SELECT id, updated_at AS "updatedAt" FROM app_users`)
+  const byId = new Map(rows.map((r) => [r.id, r.updatedAt]))
+  res.json(CHILD_IDS.map((id) => ({ id, hasPassword: byId.has(id), updatedAt: byId.get(id) ?? null })))
+})
+
+router.put('/app-users/:id', async (req, res) => {
+  const { id } = req.params
+  const password = req.body?.password
+  if (!CHILD_IDS.includes(id)) return res.status(404).json({ error: 'unknown user' })
+  if (typeof password !== 'string' || password.length < 4) {
+    return res.status(400).json({ error: 'password must be at least 4 characters' })
+  }
+  await pool.query(
+    `INSERT INTO app_users (id, password_hash, updated_at) VALUES ($1, $2, $3)
+     ON CONFLICT (id) DO UPDATE SET password_hash = EXCLUDED.password_hash, updated_at = EXCLUDED.updated_at`,
+    [id, hashPassword(password), Date.now()],
+  )
+  res.json({ ok: true })
+})
 
 function isSameDay(a, b) {
   const da = new Date(a)
@@ -47,15 +129,16 @@ function summarizeAttempts(sessions) {
  */
 const FIRST_SAVE_ONLY = `s.id = (SELECT MIN(d.id) FROM quiz_sessions d WHERE d.group_id = s.group_id AND d.round = s.round)`
 
-async function fetchAllSessions() {
-  const { rows } = await pool.query(`
-    SELECT s.id, s.group_id AS "groupId", s.word_set_id AS "wordSetId", s.word_set_title AS "wordSetTitle",
-           s.round, s.started_at AS "startedAt", s.finished_at AS "finishedAt", s.duration_ms AS "durationMs",
-           s.total_questions AS "totalQuestions", s.correct_count AS "correctCount", s.wrong_count AS "wrongCount"
-    FROM quiz_sessions s
-    WHERE ${FIRST_SAVE_ONLY}
-    ORDER BY s.started_at DESC
-  `)
+async function fetchAllSessions(owner) {
+  const { rows } = await pool.query(
+    `SELECT s.id, s.group_id AS "groupId", s.word_set_id AS "wordSetId", s.word_set_title AS "wordSetTitle",
+            s.round, s.started_at AS "startedAt", s.finished_at AS "finishedAt", s.duration_ms AS "durationMs",
+            s.total_questions AS "totalQuestions", s.correct_count AS "correctCount", s.wrong_count AS "wrongCount"
+     FROM quiz_sessions s
+     WHERE s.owner = $1 AND ${FIRST_SAVE_ONLY}
+     ORDER BY s.started_at DESC`,
+    [owner],
+  )
   return rows
 }
 
@@ -87,26 +170,29 @@ async function updateWrongNote(client, answer, { groupId, round, finishedAt }) {
 
 // ---- word sets ----
 
-router.get('/wordsets', async (_req, res) => {
-  const { rows } = await pool.query(`
-    SELECT ws.id, ws.title, ws.kind, ws.created_at AS "createdAt", COUNT(w.id)::int AS count
-    FROM word_sets ws
-    LEFT JOIN words w ON w.word_set_id = ws.id
-    GROUP BY ws.id
-    ORDER BY ws.created_at DESC
-  `)
+router.get('/wordsets', async (req, res) => {
+  const { rows } = await pool.query(
+    `SELECT ws.id, ws.title, ws.kind, ws.created_at AS "createdAt", COUNT(w.id)::int AS count
+     FROM word_sets ws
+     LEFT JOIN words w ON w.word_set_id = ws.id
+     WHERE ws.owner = $1
+     GROUP BY ws.id
+     ORDER BY ws.created_at DESC`,
+    [ownerOf(req)],
+  )
   res.json(rows)
 })
 
-router.get('/wordsets/attempt-counts', async (_req, res) => {
+router.get('/wordsets/attempt-counts', async (req, res) => {
   // 단어장 하나로만 진행한 테스트(1라운드 기준)의 횟수. 여러 단어장을 묶어서 본 테스트는
   // 특정 단어장 하나에 속하지 않으므로(word_set_id NULL) 세지 않는다.
-  const { rows } = await pool.query(`
-    SELECT word_set_id AS "wordSetId", COUNT(DISTINCT group_id)::int AS count
-    FROM quiz_sessions
-    WHERE round = 1 AND word_set_id IS NOT NULL
-    GROUP BY word_set_id
-  `)
+  const { rows } = await pool.query(
+    `SELECT word_set_id AS "wordSetId", COUNT(DISTINCT group_id)::int AS count
+     FROM quiz_sessions
+     WHERE owner = $1 AND round = 1 AND word_set_id IS NOT NULL
+     GROUP BY word_set_id`,
+    [ownerOf(req)],
+  )
   res.json(rows)
 })
 
@@ -148,8 +234,8 @@ router.post('/wordsets', async (req, res) => {
     const {
       rows: [wordSet],
     } = await client.query(
-      `INSERT INTO word_sets (title, kind, created_at) VALUES ($1, $2, $3) RETURNING id`,
-      [title, setKind, Date.now()],
+      `INSERT INTO word_sets (title, kind, created_at, owner) VALUES ($1, $2, $3, $4) RETURNING id`,
+      [title, setKind, Date.now(), ownerOf(req)],
     )
     for (const w of words) {
       await client.query(
@@ -258,8 +344,9 @@ router.get('/homework', async (req, res) => {
     return res.status(400).json({ error: 'from, to (YYYY-MM-DD) required' })
   }
   const { rows } = await pool.query(
-    `SELECT ${HOMEWORK_COLUMNS} FROM homework WHERE due_date BETWEEN $1 AND $2 ORDER BY due_date, id`,
-    [from, to],
+    `SELECT ${HOMEWORK_COLUMNS} FROM homework
+     WHERE owner = $3 AND due_date BETWEEN $1 AND $2 ORDER BY due_date, id`,
+    [from, to, ownerOf(req)],
   )
   res.json(await withWordSets(rows))
 })
@@ -274,9 +361,9 @@ router.get('/homework/pending', async (req, res) => {
   }
   const { rows } = await pool.query(
     `SELECT ${HOMEWORK_COLUMNS} FROM homework
-     WHERE due_date = $1 OR (due_date < $1 AND completed_at IS NULL)
+     WHERE owner = $2 AND (due_date = $1 OR (due_date < $1 AND completed_at IS NULL))
      ORDER BY due_date, id`,
-    [today],
+    [today, ownerOf(req)],
   )
   const all = await withWordSets(rows)
   res.json({
@@ -307,12 +394,12 @@ router.post('/homework', async (req, res) => {
 
   // 날짜를 Postgres가 펼친다. 실수로 몇 년치를 넣는 것을 막는다.
   const { rows } = await pool.query(
-    `INSERT INTO homework (due_date, word_set_ids, question_count, created_at)
-     SELECT d::date, $3::int[], $4, $5
+    `INSERT INTO homework (due_date, word_set_ids, question_count, created_at, owner)
+     SELECT d::date, $3::int[], $4, $5, $7
      FROM generate_series($1::date, $2::date, interval '1 day') AS d
      WHERE $2::date - $1::date < $6
      RETURNING ${HOMEWORK_COLUMNS}`,
-    [fromDate, toDate, wordSetIds, count, Date.now(), MAX_RANGE_DAYS],
+    [fromDate, toDate, wordSetIds, count, Date.now(), MAX_RANGE_DAYS, ownerOf(req)],
   )
   if (rows.length === 0) {
     return res.status(400).json({ error: `range must be at most ${MAX_RANGE_DAYS} days` })
@@ -381,9 +468,9 @@ router.post('/quiz-rounds', async (req, res) => {
       rows: [session],
     } = await client.query(
       `INSERT INTO quiz_sessions
-         (group_id, word_set_id, word_set_title, round, started_at, finished_at, duration_ms, total_questions, correct_count, wrong_count)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING id`,
-      [groupId, wordSetId, wordSetTitle, round, startedAt, finishedAt, finishedAt - startedAt, answers.length, correctCount, wrongCount],
+         (group_id, word_set_id, word_set_title, round, started_at, finished_at, duration_ms, total_questions, correct_count, wrong_count, owner)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING id`,
+      [groupId, wordSetId, wordSetTitle, round, startedAt, finishedAt, finishedAt - startedAt, answers.length, correctCount, wrongCount, ownerOf(req)],
     )
     for (const a of answers) {
       await client.query(
@@ -405,8 +492,8 @@ router.post('/quiz-rounds', async (req, res) => {
 
 // ---- parent dashboard ----
 
-router.get('/attempts', async (_req, res) => {
-  res.json(summarizeAttempts(await fetchAllSessions()))
+router.get('/attempts', async (req, res) => {
+  res.json(summarizeAttempts(await fetchAllSessions(ownerOf(req))))
 })
 
 router.get('/attempts/:groupId', async (req, res) => {
@@ -414,8 +501,8 @@ router.get('/attempts/:groupId', async (req, res) => {
     `SELECT s.id, s.group_id AS "groupId", s.word_set_id AS "wordSetId", s.word_set_title AS "wordSetTitle",
             s.round, s.started_at AS "startedAt", s.finished_at AS "finishedAt", s.duration_ms AS "durationMs",
             s.total_questions AS "totalQuestions", s.correct_count AS "correctCount", s.wrong_count AS "wrongCount"
-     FROM quiz_sessions s WHERE s.group_id = $1 AND ${FIRST_SAVE_ONLY} ORDER BY s.round`,
-    [req.params.groupId],
+     FROM quiz_sessions s WHERE s.group_id = $1 AND s.owner = $2 AND ${FIRST_SAVE_ONLY} ORDER BY s.round`,
+    [req.params.groupId, ownerOf(req)],
   )
   const sessionIds = rounds.map((r) => r.id)
   const { rows: answers } =
@@ -436,7 +523,8 @@ router.get('/missed-words', async (req, res) => {
     `SELECT a.term, a.meaning
      FROM quiz_answers a
      JOIN quiz_sessions s ON s.id = a.session_id
-     WHERE a.correct = false AND ${FIRST_SAVE_ONLY}`,
+     WHERE a.correct = false AND s.owner = $1 AND ${FIRST_SAVE_ONLY}`,
+    [ownerOf(req)],
   )
   const counts = new Map()
   for (const a of wrongAnswers) {
@@ -452,17 +540,19 @@ router.get('/missed-words', async (req, res) => {
 
 // ---- wrong notes ----
 
-router.get('/wrong-notes', async (_req, res) => {
-  const { rows } = await pool.query(`
-    SELECT n.word_id AS "wordId", w.term, w.meaning, w.is_idiom AS "isIdiom", w.part_of_speech AS "partOfSpeech",
-           w.past, w.participle,
-           w.word_set_id AS "wordSetId", ws.title AS "wordSetTitle",
-           n.wrong_count AS "wrongCount", n.last_wrong_at AS "lastWrongAt", n.resolved_at AS "resolvedAt"
-    FROM wrong_notes n
-    JOIN words w ON w.id = n.word_id
-    JOIN word_sets ws ON ws.id = w.word_set_id
-    ORDER BY n.last_wrong_at DESC
-  `)
+router.get('/wrong-notes', async (req, res) => {
+  const { rows } = await pool.query(
+    `SELECT n.word_id AS "wordId", w.term, w.meaning, w.is_idiom AS "isIdiom", w.part_of_speech AS "partOfSpeech",
+            w.past, w.participle,
+            w.word_set_id AS "wordSetId", ws.title AS "wordSetTitle",
+            n.wrong_count AS "wrongCount", n.last_wrong_at AS "lastWrongAt", n.resolved_at AS "resolvedAt"
+     FROM wrong_notes n
+     JOIN words w ON w.id = n.word_id
+     JOIN word_sets ws ON ws.id = w.word_set_id
+     WHERE ws.owner = $1
+     ORDER BY n.last_wrong_at DESC`,
+    [ownerOf(req)],
+  )
   res.json(rows)
 })
 
@@ -477,11 +567,16 @@ router.patch('/wrong-notes/:wordId', async (req, res) => {
   res.json({ ok: true })
 })
 
-router.get('/home-stats', async (_req, res) => {
+router.get('/home-stats', async (req, res) => {
+  const owner = ownerOf(req)
   const {
     rows: [{ count: totalWords }],
-  } = await pool.query(`SELECT COUNT(*)::int AS count FROM words`)
-  const attempts = summarizeAttempts(await fetchAllSessions())
+  } = await pool.query(
+    `SELECT COUNT(*)::int AS count FROM words w
+     JOIN word_sets ws ON ws.id = w.word_set_id WHERE ws.owner = $1`,
+    [owner],
+  )
+  const attempts = summarizeAttempts(await fetchAllSessions(owner))
 
   const weekAgo = Date.now() - 7 * 24 * 60 * 60 * 1000
   const recent = attempts.filter((a) => a.startedAt >= weekAgo)
@@ -506,7 +601,13 @@ router.get('/home-stats', async (_req, res) => {
 
   const {
     rows: [{ count: wrongNoteCount }],
-  } = await pool.query(`SELECT COUNT(*)::int AS count FROM wrong_notes WHERE resolved_at IS NULL`)
+  } = await pool.query(
+    `SELECT COUNT(*)::int AS count FROM wrong_notes n
+     JOIN words w ON w.id = n.word_id
+     JOIN word_sets ws ON ws.id = w.word_set_id
+     WHERE n.resolved_at IS NULL AND ws.owner = $1`,
+    [owner],
+  )
 
   res.json({ totalWords, weeklyAccuracy, streakDays, wrongNoteCount })
 })
@@ -516,9 +617,9 @@ router.get('/home-stats', async (_req, res) => {
 // 로그인 시스템이 아니라 '가계부' 메뉴 진입용 비밀번호 확인만 한다. DB는 쓰지 않는다.
 router.post('/expense/verify-password', (req, res) => {
   const { password } = req.body
-  const expected = process.env.HOUSEHOLD_PASSWORD
+  const expected = servicePassword()
   if (!expected) {
-    return res.status(500).json({ error: 'HOUSEHOLD_PASSWORD is not configured' })
+    return res.status(500).json({ error: 'DIRECTORHOME_PASSWORD is not configured' })
   }
   res.json({ ok: password === expected })
 })

@@ -204,6 +204,27 @@ export async function migrate() {
     ALTER TABLE homework ADD COLUMN IF NOT EXISTS attempted_at BIGINT;
     ALTER TABLE homework ADD COLUMN IF NOT EXISTS attempt_correct INTEGER;
     ALTER TABLE homework ADD COLUMN IF NOT EXISTS attempt_total INTEGER;
+
+    -- ---- 아이별 단어장 분리 (JunsVoca / BeensVoca) ----
+    -- 단어장·숙제·시험기록에 주인을 붙인다. 기본값이 'junsvoca'라 이 칸이 생기기 전에
+    -- 쌓인 기록은 전부 첫째 것이 아니라 둘째(Juns) 것으로 남는다 -- 지금까지 이 앱은
+    -- Juns 혼자 썼다. 오답 노트는 단어 -> 단어장을 타고 가면 주인을 알 수 있어 칸을 두지 않는다.
+    ALTER TABLE word_sets ADD COLUMN IF NOT EXISTS owner TEXT NOT NULL DEFAULT 'junsvoca';
+    ALTER TABLE homework ADD COLUMN IF NOT EXISTS owner TEXT NOT NULL DEFAULT 'junsvoca';
+    ALTER TABLE quiz_sessions ADD COLUMN IF NOT EXISTS owner TEXT NOT NULL DEFAULT 'junsvoca';
+
+    CREATE INDEX IF NOT EXISTS idx_word_sets_owner ON word_sets(owner);
+    CREATE INDEX IF NOT EXISTS idx_homework_owner_due ON homework(owner, due_date);
+    CREATE INDEX IF NOT EXISTS idx_quiz_sessions_owner ON quiz_sessions(owner);
+
+    -- 아이 계정 비밀번호. admin 비밀번호는 여기 두지 않는다 -- 그것은 가계부·OPIC과
+    -- 같은 환경변수(DIRECTORHOME_PASSWORD)라 배포 설정에서 관리한다.
+    -- password_hash는 'salt:hash' 형식(scrypt). 행이 없으면 아직 비밀번호 미설정이다.
+    CREATE TABLE IF NOT EXISTS app_users (
+      id TEXT PRIMARY KEY,
+      password_hash TEXT NOT NULL,
+      updated_at BIGINT NOT NULL
+    );
   `)
 
   // 오답 노트 기능 이전의 틀린 기록으로 노트를 채운다. 이미 노트에 있는 단어는 건드리지 않는다.

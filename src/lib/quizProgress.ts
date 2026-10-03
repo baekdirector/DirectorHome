@@ -1,6 +1,8 @@
 // 테스트 도중(브라우저 뒤로가기, 앱 전환 등으로) 화면을 벗어나도 이어서 풀 수 있도록
 // 진행 상황을 기기에 저장한다. 서버에는 완료된 라운드만 기록되므로, 이 저장은 순전히
 // "다시 들어왔을 때 어디까지 풀었는지" 복구용이다.
+import { loadProfile, viewingOwner } from './profile'
+
 import type { QuizAnswerRecord } from './db'
 import type { Question } from './quiz'
 
@@ -25,7 +27,8 @@ export interface QuizProgress {
 }
 
 function storageKey(idsKey: string): string {
-  return `junsvoca_quiz_progress:${idsKey || 'wrong'}`
+  // 오답 노트 시험은 열쇠가 'wrong' 하나뿐이라 아이를 구분하지 않으면 서로의 진행 상황을 덮어쓴다.
+  return `junsvoca_quiz_progress:${viewingOwner(loadProfile())}:${idsKey || 'wrong'}`
 }
 
 export function loadQuizProgress(idsKey: string): QuizProgress | null {

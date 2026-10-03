@@ -2,6 +2,8 @@
 // exported names/shapes as the earlier IndexedDB (Dexie) version, so pages
 // didn't need to change their call sites -- only this module's internals.
 
+import { loadProfile, viewingOwner } from './profile'
+
 export interface WordSetRecord {
   id: number
   title: string
@@ -53,8 +55,11 @@ export interface QuizAnswerRecord {
 }
 
 async function api<T>(path: string, init?: RequestInit): Promise<T> {
+  // 단어장·숙제·기록은 아이마다 따로 쌓인다. 지금 보고 있는 아이를 서버에 알려준다.
+  const headers: Record<string, string> = { 'X-Voca-Owner': viewingOwner(loadProfile()) }
+  if (init?.body) headers['Content-Type'] = 'application/json'
   const res = await fetch(`/api${path}`, {
-    headers: init?.body ? { 'Content-Type': 'application/json' } : undefined,
+    headers,
     ...init,
   })
   if (!res.ok) {

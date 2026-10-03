@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import express from 'express'
-import { router } from './routes.js'
+import { hashPassword, ownerOf, router, verifyHashed } from './routes.js'
 import { migrate } from './db.js'
 
 describe('POST /expense/verify-password', () => {
@@ -8,7 +8,7 @@ describe('POST /expense/verify-password', () => {
   let baseUrl
 
   beforeAll(() => {
-    process.env.HOUSEHOLD_PASSWORD = 'test-only-password'
+    process.env.DIRECTORHOME_PASSWORD = 'test-only-password'
     const app = express()
     app.use(express.json())
     app.use('/api', router)
@@ -257,5 +257,84 @@ describe.skipIf(!hasDb)('단어장 삭제', () => {
     expect(detail.rounds).toHaveLength(1)
     expect(detail.rounds[0].wordSetTitle).toBe('삭제 테스트 단어장')
     expect(detail.rounds[0].wordSetId).toBeNull()
+  })
+})
+
+describe('POST /login (admin)', () => {
+  let server
+  let baseUrl
+
+  beforeAll(() => {
+    process.env.DIRECTORHOME_PASSWORD = 'test-only-password'
+    const app = express()
+    app.use(express.json())
+    app.use('/api', router)
+    return new Promise((resolve) => {
+      server = app.listen(0, () => {
+        baseUrl = `http://localhost:${server.address().port}/api`
+        resolve()
+      })
+    })
+  })
+
+  afterAll(() => new Promise((resolve) => server.close(resolve)))
+
+  const post = (body) =>
+    fetch(`${baseUrl}/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    })
+
+  it('admin 비밀번호가 맞으면 admin 프로필을 돌려준다', async () => {
+    const res = await post({ id: 'admin', password: 'test-only-password' })
+    expect(await res.json()).toEqual({ ok: true, profile: 'admin' })
+  })
+
+  it('admin 비밀번호가 틀리면 ok: false', async () => {
+    const res = await post({ id: 'admin', password: 'nope' })
+    expect(await res.json()).toEqual({ ok: false, profile: 'admin' })
+  })
+
+  it('모르는 id는 DB를 보지 않고 바로 ok: false', async () => {
+    const res = await post({ id: 'someone', password: 'whatever' })
+    expect(await res.json()).toEqual({ ok: false })
+  })
+
+  it('id나 비밀번호가 빠지면 400', async () => {
+    expect((await post({ id: 'admin' })).status).toBe(400)
+  })
+})
+
+describe('ownerOf', () => {
+  const req = (value) => ({ get: () => value })
+
+  it('헤더가 아이 계정이면 그 값을 쓴다', () => {
+    expect(ownerOf(req('beensvoca'))).toBe('beensvoca')
+    expect(ownerOf(req('junsvoca'))).toBe('junsvoca')
+  })
+
+  it('헤더가 없거나 모르는 값이면 기존 데이터의 주인(junsvoca)으로 떨어진다', () => {
+    expect(ownerOf(req(undefined))).toBe('junsvoca')
+    expect(ownerOf(req('admin'))).toBe('junsvoca')
+    expect(ownerOf(req('../../etc'))).toBe('junsvoca')
+  })
+})
+
+describe('비밀번호 해시', () => {
+  it('같은 비밀번호는 통과하고 다른 비밀번호는 막힌다', () => {
+    const stored = hashPassword('hunter2')
+    expect(verifyHashed('hunter2', stored)).toBe(true)
+    expect(verifyHashed('hunter3', stored)).toBe(false)
+  })
+
+  it('같은 비밀번호라도 저장값은 매번 달라진다(소금이 붙는다)', () => {
+    expect(hashPassword('same')).not.toBe(hashPassword('same'))
+  })
+
+  it('망가진 저장값은 던지지 않고 false', () => {
+    expect(verifyHashed('x', '')).toBe(false)
+    expect(verifyHashed('x', 'nosalt')).toBe(false)
+    expect(verifyHashed('x', 'salt:zz')).toBe(false)
   })
 })

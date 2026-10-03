@@ -8,6 +8,8 @@ import { getHomeStats, getPendingHomework, type HomeStats, type PendingHomework 
 import { HomeworkCard } from '../components/HomeworkCard'
 import { localDateString } from '../lib/homework'
 import { useSlowLoading } from '../lib/useSlowLoading'
+import { OwnerSwitch, useProfile } from '../components/ProfileGate'
+import { PROFILE_LABEL } from '../lib/profile'
 
 function todayLabel(date: string) {
   const [y, m, day] = date.split('-').map(Number)
@@ -17,24 +19,28 @@ function todayLabel(date: string) {
 }
 
 export function Home() {
+  const { owner, isAdmin } = useProfile()
   const [stats, setStats] = useState<HomeStats | null>(null)
   const [statsFailed, setStatsFailed] = useState(false)
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [homework, setHomework] = useState<PendingHomework | null>(null)
   const [today, setToday] = useState(localDateString)
 
+  // owner가 바뀌면(부모 모드에서 아이 전환) 통계를 그 아이 것으로 다시 받는다.
   useEffect(() => {
+    setStats(null)
+    setStatsFailed(false)
     getHomeStats()
       .then(setStats)
       .catch(() => setStatsFailed(true))
-  }, [])
+  }, [owner])
 
   useEffect(() => {
     getPendingHomework(today)
       .then(setHomework)
       // 숙제는 홈의 일부일 뿐이다. 못 불러와도 통계·오답노트·단어장은 보여준다.
       .catch(() => setHomework({ today: [], overdue: [] }))
-  }, [today])
+  }, [today, owner])
 
   // 홈 화면을 띄워 둔 채 자정을 넘기면(설치형 앱에서는 흔하다) 어제 숙제가 "오늘의 숙제"로
   // 남는다. 화면으로 돌아올 때마다 날짜를 다시 재고, 바뀌었으면 위 effect가 다시 돈다.
@@ -69,9 +75,12 @@ export function Home() {
             className="flex items-center gap-2"
           >
             <img src="/icons/icon-192.png" alt="" width={36} height={36} className="h-9 w-9 rounded-[10px]" />
-            <span className="font-display text-[19px] font-bold">JunsVoca</span>
+            <span className="font-display text-[19px] font-bold">{PROFILE_LABEL[owner]}</span>
           </button>
           <div className="flex items-center gap-2">
+            <OwnerSwitch className="mr-1" />
+            {isAdmin && (
+              <>
             <Link
               to="/admin"
               aria-label="숙제 관리"
@@ -86,6 +95,8 @@ export function Home() {
             >
               <ChartIcon width={20} height={20} />
             </Link>
+              </>
+            )}
           </div>
         </div>
 

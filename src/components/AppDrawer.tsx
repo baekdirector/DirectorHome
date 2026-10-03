@@ -1,9 +1,15 @@
 import { Link, useLocation } from 'react-router-dom'
 import { BookIcon, MicIcon, WalletIcon } from './icons'
+import { useProfile } from './ProfileGate'
+import { PROFILE_LABEL } from '../lib/profile'
 
-/** DirectorHome 산하 서비스(JunsVoca / 가계부)를 전환하는 좌측 슬라이드 메뉴. */
+/**
+ * DirectorHome 산하 서비스를 전환하는 좌측 슬라이드 메뉴.
+ * 가계부·OPIC은 부모 모드(admin)에서만 보인다 -- 아이 화면에 어른 메뉴를 늘어놓지 않는다.
+ */
 export function AppDrawer({ open, onClose }: { open: boolean; onClose: () => void }) {
   const { pathname } = useLocation()
+  const { owner, isAdmin, logout } = useProfile()
   const onHousehold = pathname.startsWith('/household')
   const onOpic = pathname.startsWith('/opic')
   const onVoca = !onHousehold && !onOpic
@@ -41,10 +47,15 @@ export function AppDrawer({ open, onClose }: { open: boolean; onClose: () => voi
               <BookIcon width={19} height={19} className="text-accent-dark" strokeWidth={1.8} />
             </div>
             <div className="flex-1">
-              <div className={`text-[15px] font-bold ${onVoca ? 'text-primary' : 'text-ink'}`}>JunsVoca</div>
+              <div className={`text-[15px] font-bold ${onVoca ? 'text-primary' : 'text-ink'}`}>
+                {PROFILE_LABEL[owner]}
+              </div>
               <div className="text-[12.5px] text-ink-muted">자녀 영단어 학습</div>
             </div>
           </Link>
+
+          {isAdmin && (
+          <>
 
           <Link
             to="/household"
@@ -73,7 +84,19 @@ export function AppDrawer({ open, onClose }: { open: boolean; onClose: () => voi
               <div className="text-[12.5px] text-ink-muted">스크립트 암기장</div>
             </div>
           </Link>
+          </>
+          )}
         </nav>
+
+        <div className="mt-auto border-t border-border py-4">
+          <button
+            type="button"
+            onClick={logout}
+            className="w-full rounded-[14px] border border-border p-3 text-[13.5px] font-semibold text-ink-muted"
+          >
+            로그아웃 (다른 사람으로 들어가기)
+          </button>
+        </div>
       </div>
     </div>
   )

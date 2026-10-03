@@ -11,6 +11,7 @@ import { ParentDashboard } from './pages/ParentDashboard'
 import { ParentSessionDetail } from './pages/ParentSessionDetail'
 import { Admin } from './pages/Admin'
 import { HouseholdBackGuard } from './components/HouseholdBackGuard'
+import { ProfileGate } from './components/ProfileGate'
 import { Loading } from './components/Loading'
 
 // 가계부와 OPIC은 서로 다른 사용자가 쓰는 화면이다(아이는 JunsVoca만, 어른은 가계부·OPIC).
@@ -29,38 +30,40 @@ const OpicMock = page(() => import('./pages/OpicMock'), 'OpicMock')
 function App() {
   return (
     <BrowserRouter>
-      <HouseholdBackGuard />
-      <Routes>
-        <Route path="/" element={<Home />} />
-        <Route path="/input" element={<TextInput />} />
-        <Route path="/wordsets" element={<WordSets />} />
-        <Route path="/wordsets/review" element={<WordReview />} />
-        <Route path="/wordsets/:id" element={<WordReview />} />
-        <Route path="/test" element={<TestSelect />} />
-        <Route path="/test/start" element={<Quiz />} />
-        <Route path="/quiz/homework/:homeworkId" element={<Quiz />} />
-        <Route path="/quiz/:wordSetId" element={<Quiz />} />
-        <Route path="/wrong" element={<WrongNotes />} />
-        <Route path="/wrong/quiz" element={<Quiz />} />
-        <Route path="/parent" element={<ParentDashboard />} />
-        <Route path="/parent/session/:groupId" element={<ParentSessionDetail />} />
-        <Route path="/admin" element={<Admin />} />
-        <Route
-          element={
-            <Suspense fallback={<Loading screen />}>
-              <Outlet />
-            </Suspense>
-          }
-        >
-          <Route path="/household" element={<Household />} />
-          <Route path="/household/stats" element={<HouseholdStats />} />
-          <Route path="/household/categories" element={<HouseholdCategories />} />
-          <Route path="/opic" element={<OpicHome />} />
-          <Route path="/opic/t/:topicId" element={<OpicTopic />} />
-          <Route path="/opic/t/:topicId/q/:questionId" element={<OpicScript />} />
-          <Route path="/opic/mock" element={<OpicMock />} />
-        </Route>
-      </Routes>
+      <ProfileGate>
+        <HouseholdBackGuard />
+        <Routes>
+          <Route path="/" element={<Home />} />
+          <Route path="/input" element={<TextInput />} />
+          <Route path="/wordsets" element={<WordSets />} />
+          <Route path="/wordsets/review" element={<WordReview />} />
+          <Route path="/wordsets/:id" element={<WordReview />} />
+          <Route path="/test" element={<TestSelect />} />
+          <Route path="/test/start" element={<Quiz />} />
+          <Route path="/quiz/homework/:homeworkId" element={<Quiz />} />
+          <Route path="/quiz/:wordSetId" element={<Quiz />} />
+          <Route path="/wrong" element={<WrongNotes />} />
+          <Route path="/wrong/quiz" element={<Quiz />} />
+          <Route path="/parent" element={<ParentDashboard />} />
+          <Route path="/parent/session/:groupId" element={<ParentSessionDetail />} />
+          <Route path="/admin" element={<Admin />} />
+          <Route
+            element={
+              <Suspense fallback={<Loading screen />}>
+                <Outlet />
+              </Suspense>
+            }
+          >
+            <Route path="/household" element={<Household />} />
+            <Route path="/household/stats" element={<HouseholdStats />} />
+            <Route path="/household/categories" element={<HouseholdCategories />} />
+            <Route path="/opic" element={<OpicHome />} />
+            <Route path="/opic/t/:topicId" element={<OpicTopic />} />
+            <Route path="/opic/t/:topicId/q/:questionId" element={<OpicScript />} />
+            <Route path="/opic/mock" element={<OpicMock />} />
+          </Route>
+        </Routes>
+      </ProfileGate>
     </BrowserRouter>
   )
 }
